@@ -6,10 +6,11 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "9032:3000"
+      - "9032:9032"
     environment:
       - NODE_ENV=production
       - NEXT_TELEMETRY_DISABLED=1
+      - PORT=9032
     restart: unless-stopped
     container_name: philippine-cooperative-system
     networks:
