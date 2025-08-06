@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  cooperative-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "9032:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
+    restart: unless-stopped
+    container_name: philippine-cooperative-system
+    networks:
+      - cooperative-network
+
+networks:
+  cooperative-network:
+    driver: bridge
