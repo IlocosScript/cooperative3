@@ -16,9 +16,6 @@ import {
   Search, 
   Eye, 
   Edit, 
-  ArrowLeft,
-  Building2,
-  LogOut,
   Phone,
   Mail,
   MapPin,
@@ -31,6 +28,8 @@ import {
 } from 'lucide-react';
 import { Member, MembersQueryParams, getStatusLabel, getStatusVariant, getMembershipTypeLabel, getGenderLabel, getCivilStatusLabel } from '@/lib/types/members';
 import MembersApiService from '@/lib/services/membersApi';
+import MemberDetailsModal from '@/components/ui/member-details-modal';
+import CreateMemberModal from '@/components/ui/create-member-modal';
 
 interface User {
   username: string;
@@ -63,18 +62,7 @@ export default function MembersPage() {
   const [sortBy, setSortBy] = useState<'firstName' | 'lastName' | 'memberNumber' | 'dateOfBirth' | 'createdAt'>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   
-  const [newMember, setNewMember] = useState<Partial<Member>>({
-    FirstName: '',
-    LastName: '',
-    MiddleName: '',
-    DateOfBirth: '',
-    GenderType: 1,
-    CivilStatus: 1,
-    Status: 1,
-    MembershipType: 1,
-    PrimaryAddress: '',
-    PrimaryContactNumber: ''
-  });
+
   const router = useRouter();
 
   // Function to fetch members from API
@@ -98,17 +86,7 @@ export default function MembersPage() {
     try {
       const response = await MembersApiService.getMembers(apiParams);
       
-      console.log('API Response:', response);
-      console.log('Members data:', response.data.items);
-      console.log('First member structure:', response.data.items?.[0]);
-      console.log('First member keys:', response.data.items?.[0] ? Object.keys(response.data.items[0]) : 'No members');
-      console.log('Total count:', response.data.totalCount);
-      console.log('Page size requested:', pageSize);
-      console.log('Current page:', currentPage);
-      console.log('Total pages:', response.data.totalPages);
-      console.log('Has next page:', response.data.hasNextPage);
-      console.log('Has previous page:', response.data.hasPreviousPage);
-      console.log('Number of members returned:', response.data.items?.length || 0);
+
       
       setMembers(response.data.items || []);
       
@@ -163,36 +141,37 @@ export default function MembersPage() {
     };
   }, [searchTerm]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('cooperative-user');
-    router.push('/');
-  };
 
-  const handleAddMember = async () => {
+
+  const handleCreateMember = async (data: any) => {
     try {
       setIsLoading(true);
-      await MembersApiService.createMember(newMember);
       
-      // Reset form
-      setNewMember({
-        firstName: '',
-        lastName: '',
-        middleName: '',
-        dateOfBirth: '',
-        genderType: 1,
-        civilStatus: 1,
-        status: 1,
-        membershipType: 1,
-        primaryAddress: '',
-        primaryContactNumber: ''
-      });
-      setIsAddDialogOpen(false);
+      // Transform the new modal data to match the API structure
+      const memberData = {
+        FirstName: data.firstName,
+        LastName: data.lastName,
+        MiddleName: data.middleName,
+        DateOfBirth: data.dateOfBirth,
+        GenderType: data.genderType,
+        CivilStatus: data.civilStatus,
+        Status: 1, // Default to active
+        MembershipType: data.membershipType,
+        PrimaryAddress: data.addresses.find((addr: any) => addr.isPrimary)?.streetAddress1 || '',
+        PrimaryContactNumber: data.contactNumbers.find((contact: any) => contact.isPrimary)?.phoneNumber || ''
+      };
+      
+      await MembersApiService.createMember(memberData);
       
       // Refresh members list
       fetchMembers();
+      
+      // Show success message (you can add a toast notification here)
+      console.log('Member created successfully:', data);
+      
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add member');
-      console.error('Error adding member:', err);
+      setError(err instanceof Error ? err.message : 'Failed to create member');
+      console.error('Error creating member:', err);
     } finally {
       setIsLoading(false);
     }
@@ -220,37 +199,6 @@ export default function MembersPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-3">
-              <Button variant="ghost" size="sm" onClick={() => router.push('/dashboard')}>
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Dashboard
-              </Button>
-              <div className="bg-green-600 p-2 rounded-lg">
-                <Building2 className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">Member Management</h1>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
-                  {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
-                </Badge>
-              </div>
-              <Button variant="ghost" size="sm" onClick={handleLogout}>
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -264,8 +212,8 @@ export default function MembersPage() {
 
             {/* Member's own profile */}
             {(() => {
-              const memberProfile = members && members.length > 0 ? members.find(m => m.memberNumber === 'M002') : null; // Assuming logged in member is M002
-              console.log('Member profile found:', memberProfile);
+              const memberProfile = members && members.length > 0 ? members.find(m => m.MemberNumber === 'M002') : null; // Assuming logged in member is M002
+         
               return memberProfile ? (
                 <Card>
                   <CardHeader>
@@ -276,12 +224,12 @@ export default function MembersPage() {
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <Label className="text-sm font-medium text-gray-600">Member Number</Label>
-                          <p className="text-lg font-medium">{memberProfile.memberNumber}</p>
+                          <p className="text-lg font-medium">{memberProfile.MemberNumber}</p>
                         </div>
                         <div>
                           <Label className="text-sm font-medium text-gray-600">Status</Label>
-                          <Badge variant={getStatusVariant(memberProfile.status)}>
-                            {getStatusLabel(memberProfile.status)}
+                          <Badge variant={getStatusVariant(memberProfile.Status)}>
+                            {memberProfile.Status}
                           </Badge>
                         </div>
                       </div>
@@ -289,25 +237,25 @@ export default function MembersPage() {
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <Label className="text-sm font-medium text-gray-600">Full Name</Label>
-                          <p className="text-lg">{memberProfile.fullName}</p>
-                          {memberProfile.middleName && (
-                            <p className="text-sm text-gray-500">Middle Name: {memberProfile.middleName}</p>
+                          <p className="text-lg">{memberProfile.FullName}</p>
+                          {memberProfile.MiddleName && (
+                            <p className="text-sm text-gray-500">Middle Name: {memberProfile.MiddleName}</p>
                           )}
                         </div>
                         <div>
                           <Label className="text-sm font-medium text-gray-600">Age</Label>
-                          <p className="text-lg">{memberProfile.age} years old</p>
+                          <p className="text-lg">{memberProfile.Age} years old</p>
                         </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <Label className="text-sm font-medium text-gray-600">Gender</Label>
-                          <p className="text-lg">{getGenderLabel(memberProfile.genderType)}</p>
+                          <p className="text-lg">{memberProfile.GenderType}</p>
                         </div>
                         <div>
                           <Label className="text-sm font-medium text-gray-600">Civil Status</Label>
-                          <p className="text-lg">{getCivilStatusLabel(memberProfile.civilStatus)}</p>
+                          <p className="text-lg">{getCivilStatusLabel(memberProfile.CivilStatus)}</p>
                         </div>
                       </div>
 
@@ -315,33 +263,64 @@ export default function MembersPage() {
                         <div>
                           <Label className="text-sm font-medium text-gray-600">Membership Type</Label>
                           <Badge variant="outline">
-                            {getMembershipTypeLabel(memberProfile.membershipType)}
+                            {memberProfile.MembershipType}
                           </Badge>
                         </div>
                         <div>
                           <Label className="text-sm font-medium text-gray-600">Date of Birth</Label>
-                          <p className="text-lg">{new Date(memberProfile.dateOfBirth).toLocaleDateString()}</p>
+                          <p className="text-lg">{new Date(memberProfile.DateOfBirth).toLocaleDateString()}</p>
                         </div>
                       </div>
 
-                      <div className="space-y-3">
-                        <div className="flex items-center space-x-2">
-                          <Phone className="w-4 h-4 text-gray-400" />
-                          <span>{memberProfile.primaryContactNumber}</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <MapPin className="w-4 h-4 text-gray-400" />
-                          <span>{memberProfile.primaryAddress}</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Calendar className="w-4 h-4 text-gray-400" />
-                          <span>Joined: {new Date(memberProfile.createdAt).toLocaleDateString()}</span>
-                        </div>
-                      </div>
+                                             <div className="space-y-3">
+                         <div className="flex items-center space-x-2">
+                           <Phone className="w-4 h-4 text-gray-400" />
+                           <span>{memberProfile.PrimaryContactNumber}</span>
+                         </div>
+                         <div className="flex items-center space-x-2">
+                           <MapPin className="w-4 h-4 text-gray-400" />
+                           <span>{memberProfile.PrimaryAddress}</span>
+                         </div>
+                         <div className="flex items-center space-x-2">
+                           <Calendar className="w-4 h-4 text-gray-400" />
+                           <span>Joined: {new Date(memberProfile.CreatedAt).toLocaleDateString()}</span>
+                         </div>
+                       </div>
+
+                       {/* Contact Numbers Section */}
+                       <div className="border-t pt-4">
+                         <div className="flex items-center justify-between mb-3">
+                           <Label className="text-sm font-medium text-gray-600">Contact Numbers</Label>
+                           <Badge variant="outline" className="text-xs">
+                             {memberProfile.PrimaryContactNumber ? '1 contact' : 'No contacts'}
+                           </Badge>
+                         </div>
+                         <div className="space-y-2">
+                           {memberProfile.PrimaryContactNumber ? (
+                             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                               <div className="flex items-center space-x-3">
+                                 <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                                   <Phone className="w-4 h-4 text-green-600" />
+                                 </div>
+                                 <div>
+                                   <p className="font-medium">{memberProfile.PrimaryContactNumber}</p>
+                                   <p className="text-xs text-gray-500">Primary Contact</p>
+                                 </div>
+                               </div>
+                               <Badge variant="secondary" className="text-xs">Primary</Badge>
+                             </div>
+                           ) : (
+                             <div className="text-center py-4 text-gray-500">
+                               <Phone className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                               <p className="text-sm">No contact numbers available</p>
+                             </div>
+                           )}
+                         </div>
+                       </div>
 
                       <div className="border-t pt-4">
                         <Label className="text-sm font-medium text-gray-600">Member ID</Label>
-                        <p className="text-sm text-gray-500">#{memberProfile.id}</p>
+                        <p className="text-sm text-gray-500">#{memberProfile.Id}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -358,148 +337,12 @@ export default function MembersPage() {
             <h2 className="text-2xl font-bold text-gray-900">Members</h2>
             <p className="text-gray-600">Manage your cooperative members</p>
           </div>
-          {(user.role === 'admin' || user.role === 'staff') && (
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Member
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Add New Member</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <Label htmlFor="firstName">First Name *</Label>
-                    <Input
-                      id="firstName"
-                      value={newMember.firstName}
-                      onChange={(e) => setNewMember({...newMember, firstName: e.target.value})}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="middleName">Middle Name</Label>
-                    <Input
-                      id="middleName"
-                      value={newMember.middleName || ''}
-                      onChange={(e) => setNewMember({...newMember, middleName: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="lastName">Last Name *</Label>
-                    <Input
-                      id="lastName"
-                      value={newMember.lastName}
-                      onChange={(e) => setNewMember({...newMember, lastName: e.target.value})}
-                      required
-                    />
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="dateOfBirth">Date of Birth *</Label>
-                    <Input
-                      id="dateOfBirth"
-                      type="date"
-                      value={newMember.dateOfBirth}
-                      onChange={(e) => setNewMember({...newMember, dateOfBirth: e.target.value})}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="genderType">Gender *</Label>
-                    <Select value={newMember.genderType?.toString()} onValueChange={(value) => setNewMember({...newMember, genderType: parseInt(value)})}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select gender" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">Male</SelectItem>
-                        <SelectItem value="2">Female</SelectItem>
-                        <SelectItem value="3">Non-Binary</SelectItem>
-                        <SelectItem value="4">Prefer Not to Say</SelectItem>
-                        <SelectItem value="5">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="civilStatus">Civil Status *</Label>
-                    <Select value={newMember.civilStatus?.toString()} onValueChange={(value) => setNewMember({...newMember, civilStatus: parseInt(value)})}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select civil status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">Single</SelectItem>
-                        <SelectItem value="2">Married</SelectItem>
-                        <SelectItem value="3">Widowed</SelectItem>
-                        <SelectItem value="4">Divorced</SelectItem>
-                        <SelectItem value="5">Separated</SelectItem>
-                        <SelectItem value="6">Domestic Partnership</SelectItem>
-                        <SelectItem value="7">Annulled</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="membershipType">Membership Type *</Label>
-                    <Select value={newMember.membershipType?.toString()} onValueChange={(value) => setNewMember({...newMember, membershipType: parseInt(value)})}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select membership type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">Member</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="primaryAddress">Primary Address *</Label>
-                  <Textarea
-                    id="primaryAddress"
-                    value={newMember.primaryAddress}
-                    onChange={(e) => setNewMember({...newMember, primaryAddress: e.target.value})}
-                    placeholder="Enter complete address"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="primaryContactNumber">Primary Contact Number *</Label>
-                  <Input
-                    id="primaryContactNumber"
-                    value={newMember.primaryContactNumber}
-                    onChange={(e) => setNewMember({...newMember, primaryContactNumber: e.target.value})}
-                    placeholder="+63 912 345 6789"
-                    required
-                  />
-                </div>
-
-                <div className="flex justify-end space-x-2">
-                  <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleAddMember} disabled={isLoading}>
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Adding...
-                      </>
-                    ) : (
-                      'Add Member'
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-          )}
+                     {(user.role === 'admin' || user.role === 'staff') && (
+             <Button onClick={() => setIsAddDialogOpen(true)}>
+               <Plus className="w-4 h-4 mr-2" />
+               Add Member
+             </Button>
+           )}
         </div>
 
         {/* Search and Filters */}
@@ -652,7 +495,7 @@ export default function MembersPage() {
                               </div>
                               <div className="text-sm text-gray-500">
                                 {member.MiddleName && `${member.MiddleName} • `}
-                                {member.GenderType ? getGenderLabel(member.GenderType) : 'N/A'} • {member.CivilStatus ? getCivilStatusLabel(member.CivilStatus) : 'N/A'}
+                                {member.GenderType } • {member.CivilStatus }
                               </div>
                             </div>
                           </td>
@@ -665,12 +508,12 @@ export default function MembersPage() {
                           <td className="p-3">{member.Age ? `${member.Age} years` : 'N/A'}</td>
                           <td className="p-3">
                             <Badge variant={member.Status ? getStatusVariant(member.Status) : 'secondary'}>
-                              {member.Status ? getStatusLabel(member.Status) : 'N/A'}
+                              {member.Status }
                             </Badge>
                           </td>
                           <td className="p-3">
                             <Badge variant="outline">
-                              {member.MembershipType ? getMembershipTypeLabel(member.MembershipType) : 'N/A'}
+                              {member.MembershipType }
                             </Badge>
                           </td>
                           <td className="p-3 text-sm text-gray-600">
@@ -759,88 +602,19 @@ export default function MembersPage() {
           </>
         )}
 
-        {/* View Member Dialog */}
-        <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Member Details</DialogTitle>
-            </DialogHeader>
-            {selectedMember && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm font-medium text-gray-600">Member Number</Label>
-                    <p className="text-lg font-medium">{selectedMember.MemberNumber}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-gray-600">Status</Label>
-                    <Badge variant={getStatusVariant(selectedMember.Status)}>
-                      {getStatusLabel(selectedMember.Status)}
-                    </Badge>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm font-medium text-gray-600">Full Name</Label>
-                    <p className="text-lg">{selectedMember.FullName}</p>
-                    {selectedMember.FullName && (
-                      <p className="text-sm text-gray-500">Middle Name: {selectedMember.MiddleName}</p>
-                    )}
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-gray-600">Age</Label>
-                    <p className="text-lg">{selectedMember.Age} years old</p>
-                  </div>
-                </div>
+                 {/* View Member Dialog */}
+         <MemberDetailsModal
+           isOpen={isViewDialogOpen}
+           onClose={() => setIsViewDialogOpen(false)}
+           member={selectedMember}
+         />
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm font-medium text-gray-600">Gender</Label>
-                    <p className="text-lg">{getGenderLabel(selectedMember.GenderType)}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-gray-600">Civil Status</Label>
-                    <p className="text-lg">{getCivilStatusLabel(selectedMember.CivilStatus)}</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm font-medium text-gray-600">Membership Type</Label>
-                    <Badge variant="outline">
-                      {getMembershipTypeLabel(selectedMember.MembershipType)}
-                    </Badge>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-gray-600">Date of Birth</Label>
-                    <p className="text-lg">{new Date(selectedMember.DateOfBirth).toLocaleDateString()}</p>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-2">
-                    <Phone className="w-4 h-4 text-gray-400" />
-                    <span>{selectedMember.primaryContactNumber}</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <MapPin className="w-4 h-4 text-gray-400" />
-                    <span>{selectedMember.primaryAddress}</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Calendar className="w-4 h-4 text-gray-400" />
-                    <span>Joined: {new Date(selectedMember.Memb).toLocaleDateString()}</span>
-                  </div>
-                </div>
-
-                <div className="border-t pt-4">
-                  <Label className="text-sm font-medium text-gray-600">Member ID</Label>
-                  <p className="text-sm text-gray-500">#{selectedMember.id}</p>
-                </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
+         {/* Create Member Modal */}
+         <CreateMemberModal
+           isOpen={isAddDialogOpen}
+           onClose={() => setIsAddDialogOpen(false)}
+           onSubmit={handleCreateMember}
+         />
       </div>
     </div>
   );

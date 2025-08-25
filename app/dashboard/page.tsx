@@ -10,8 +10,6 @@ import {
   CreditCard, 
   PiggyBank, 
   TrendingUp, 
-  Building2,
-  LogOut,
   Plus,
   Eye,
   DollarSign,
@@ -38,10 +36,7 @@ export default function Dashboard() {
     }
   }, [router]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('cooperative-user');
-    router.push('/');
-  };
+
 
   if (!user) return <div>Loading...</div>;
 
@@ -80,34 +75,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-3">
-              <div className="bg-green-600 p-2 rounded-lg">
-                <Building2 className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">Philippine Cooperative</h1>
-                <p className="text-sm text-gray-600">Management System</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                <Badge variant={user.role === 'admin' ? 'default' : user.role === 'staff' ? 'secondary' : 'outline'}>
-                  {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
-                </Badge>
-              </div>
-              <Button variant="ghost" size="sm" onClick={handleLogout}>
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
