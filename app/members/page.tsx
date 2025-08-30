@@ -26,7 +26,7 @@ import {
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
-import { Member, MembersQueryParams, getStatusLabel, getStatusVariant, getMembershipTypeLabel, getGenderLabel, getCivilStatusLabel } from '@/lib/types/members';
+import { Member, MemberApiResponse, MembersQueryParams, getStatusLabel, getStatusVariant, getMembershipTypeLabel, getGenderLabel, getCivilStatusLabel } from '@/lib/types/members';
 import MembersApiService from '@/lib/services/membersApi';
 import MemberDetailsModal from '@/components/ui/member-details-modal';
 import CreateMemberModal from '@/components/ui/create-member-modal';
@@ -41,8 +41,9 @@ export default function MembersPage() {
   const [user, setUser] = useState<User | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const [selectedMember, setSelectedMember] = useState<MemberApiResponse | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
@@ -143,25 +144,9 @@ export default function MembersPage() {
 
 
 
-  const handleCreateMember = async (data: any) => {
+  const handleCreateMember = async (data: Member | MemberApiResponse) => {
     try {
       setIsLoading(true);
-      
-      // Transform the new modal data to match the API structure
-      const memberData = {
-        FirstName: data.firstName,
-        LastName: data.lastName,
-        MiddleName: data.middleName,
-        DateOfBirth: data.dateOfBirth,
-        GenderType: data.genderType,
-        CivilStatus: data.civilStatus,
-        Status: 1, // Default to active
-        MembershipType: data.membershipType,
-        PrimaryAddress: data.addresses.find((addr: any) => addr.isPrimary)?.streetAddress1 || '',
-        PrimaryContactNumber: data.contactNumbers.find((contact: any) => contact.isPrimary)?.phoneNumber || ''
-      };
-      
-      await MembersApiService.createMember(memberData);
       
       // Refresh members list
       fetchMembers();
@@ -172,6 +157,53 @@ export default function MembersPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create member');
       console.error('Error creating member:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpdateMember = async (data: Member | MemberApiResponse) => {
+    try {
+      setIsLoading(true);
+      
+      // Refresh members list
+      fetchMembers();
+      
+      // Show success message
+      console.log('Member updated successfully:', data);
+      
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update member');
+      console.error('Error updating member:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEditMember = async (member: Member) => {
+    try {
+      setIsLoading(true);
+      console.log('Fetching complete member data for ID:', member.Id);
+      console.log('Original member data from list:', member);
+      
+      // Fetch complete member data using the member ID
+      const completeMemberData = await MembersApiService.getMember(member.Id);
+      console.log('Complete member data received:', completeMemberData);
+      console.log('Has addresses:', !!completeMemberData.Addresses, 'Count:', completeMemberData.Addresses?.length);
+      console.log('Has contactNumbers:', !!completeMemberData.ContactNumbers, 'Count:', completeMemberData.ContactNumbers?.length);
+      console.log('Has dependents:', !!completeMemberData.Dependents, 'Count:', completeMemberData.Dependents?.length);
+      
+      // Set the complete member data for the update modal
+      console.log('Setting selectedMember for modal:', completeMemberData);
+      console.log('SelectedMember addresses:', completeMemberData.Addresses);
+      console.log('SelectedMember contactNumbers:', completeMemberData.ContactNumbers);
+      setSelectedMember(completeMemberData);
+      console.log('Opening update modal...');
+      setIsUpdateDialogOpen(true);
+      
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch member details');
+      console.error('Error fetching member details:', err);
     } finally {
       setIsLoading(false);
     }
@@ -533,7 +565,11 @@ export default function MembersPage() {
                                 <Eye className="w-4 h-4" />
                               </Button>
                               {(user.role === 'admin' || user.role === 'staff') && (
-                                <Button variant="ghost" size="sm">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => handleEditMember(member)}
+                                >
                                   <Edit className="w-4 h-4" />
                                 </Button>
                               )}
@@ -613,7 +649,21 @@ export default function MembersPage() {
          <CreateMemberModal
            isOpen={isAddDialogOpen}
            onClose={() => setIsAddDialogOpen(false)}
+           mode="create"
            onSubmit={handleCreateMember}
+         />
+
+         {/* Update Member Modal */}
+         <CreateMemberModal
+           key={`update-${selectedMember?.Id || 'new'}`}
+           isOpen={isUpdateDialogOpen}
+           onClose={() => {
+             console.log('Closing update modal');
+             setIsUpdateDialogOpen(false);
+           }}
+           mode="update"
+           memberData={selectedMember || undefined}
+           onSubmit={handleUpdateMember}
          />
       </div>
     </div>

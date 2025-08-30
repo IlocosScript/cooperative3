@@ -4,12 +4,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Phone, MapPin, Calendar } from 'lucide-react';
-import { Member, getStatusLabel, getStatusVariant, getMembershipTypeLabel, getGenderLabel, getCivilStatusLabel } from '@/lib/types/members';
+import { Member, MemberApiResponse, getStatusLabel, getStatusVariant, getMembershipTypeLabel, getGenderLabel, getCivilStatusLabel } from '@/lib/types/members';
 
 interface MemberDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  member: Member | null;
+  member: MemberApiResponse | null;
 }
 
 export default function MemberDetailsModal({ isOpen, onClose, member }: MemberDetailsModalProps) {

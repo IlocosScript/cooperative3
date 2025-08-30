@@ -1,5 +1,42 @@
 // Member DTOs for API integration
 
+// API Response interfaces (PascalCase)
+export interface MemberApiResponse {
+  Id: number;
+  MemberNumber: string;
+  FirstName: string;
+  LastName: string;
+  MiddleName: string | null;
+  DateOfBirth: string;
+  Birthplace?: string;
+  GenderType: string | number;
+  CivilStatus: string | number;
+  Tin?: string;
+  BodNumber?: string;
+  Status: string | number;
+  MembershipType: string | number;
+  MembershipDate: string | null;
+  TerminationDate?: string | null;
+  Notes?: string;
+  CreatedAt: string;
+  UpdatedAt?: string | null;
+  CreatedBy?: string;
+  UpdatedBy?: string | null;
+  FullName: string;
+  FullNameWithMiddle?: string;
+  Age: number;
+  CompleteAddress?: string;
+  PrimaryAddress: string;
+  PrimaryContactNumber: string;
+  Addresses?: AddressApiResponse[];
+  ContactNumbers?: ContactNumberApiResponse[];
+  Dependents?: DependentApiResponse[];
+  Educations?: EducationApiResponse[];
+  Incomes?: IncomeApiResponse[];
+  Attachments?: FileAttachmentApiResponse[];
+}
+
+// Form Data interfaces (camelCase)
 export interface Member {
   Id: number;
   MemberNumber: string;
@@ -7,15 +44,219 @@ export interface Member {
   LastName: string;
   MiddleName: string | null;
   DateOfBirth: string;
+  Birthplace?: string;
   GenderType: number;
   CivilStatus: number;
+  Tin?: string;
+  BodNumber?: string;
   Status: number;
   MembershipType: number;
+  MembershipDate: string;
+  TerminationDate?: string;
+  Notes?: string;
   CreatedAt: string;
+  UpdatedAt?: string;
+  CreatedBy?: string;
+  UpdatedBy?: string;
   FullName: string;
+  FullNameWithMiddle?: string;
   Age: number;
+  CompleteAddress?: string;
   PrimaryAddress: string;
   PrimaryContactNumber: string;
+  addresses?: Address[];
+  contactNumbers?: ContactNumber[];
+  dependents?: Dependent[];
+  educations?: Education[];
+  incomes?: Income[];
+  attachments?: FileAttachment[];
+}
+
+// API Response interfaces (PascalCase)
+export interface AddressApiResponse {
+  Id: number;
+  AddressType: string | number;
+  StreetAddress1: string;
+  StreetAddress2?: string;
+  City: string;
+  Province: string;
+  PostalCode: string;
+  Country: string;
+  IsPrimary: boolean;
+  IsCurrent: boolean;
+  Notes?: string;
+  CreatedAt: string;
+  UpdatedAt?: string | null;
+  CompleteAddress?: string;
+  AddressSummary?: string;
+  DisplayName?: string;
+}
+
+// Form Data interfaces (camelCase)
+export interface Address {
+  addressType: number;
+  streetAddress1: string;
+  streetAddress2?: string;
+  city: string;
+  province: string;
+  postalCode: string;
+  country: string;
+  isPrimary: boolean;
+  isCurrent: boolean;
+  notes?: string;
+}
+
+// API Response interfaces (PascalCase)
+export interface ContactNumberApiResponse {
+  Id: number;
+  PhoneNumber: string;
+  IsPrimary: boolean;
+  CreatedAt: string;
+  UpdatedAt?: string | null;
+}
+
+// Form Data interfaces (camelCase)
+export interface ContactNumber {
+  phoneNumber: string;
+  isPrimary: boolean;
+}
+
+// API Response interfaces (PascalCase)
+export interface DependentApiResponse {
+  Id: number;
+  FirstName: string;
+  LastName: string;
+  MiddleName?: string;
+  Relationship: string | number;
+  DateOfBirth?: string | null;
+  GenderType: string | number;
+  Address?: string;
+  IsDependent: boolean;
+  IsBeneficiary: boolean;
+  BenefitTypes: string[] | number[];
+  CreatedAt: string;
+  UpdatedAt?: string | null;
+  FullName: string;
+  FullNameWithMiddle?: string;
+  Age?: number | null;
+  DisplayName: string;
+  Type: string;
+  IsMinor: boolean;
+  Benefits?: Array<{
+    Id: number;
+    MemberId: number;
+    BeneficiaryId: number;
+    BenefitType: string;
+    CreatedAt: string;
+    UpdatedAt?: string | null;
+    CreatedBy?: string;
+    UpdatedBy?: string | null;
+    BeneficiaryName: string;
+    BenefitTypeName: string;
+  }>;
+}
+
+// Form Data interfaces (camelCase)
+export interface Dependent {
+  firstName: string;
+  lastName: string;
+  middleName?: string;
+  relationship: number;
+  dateOfBirth: string;
+  genderType: number;
+  address?: string;
+  isDependent: boolean;
+  isBeneficiary: boolean;
+  benefitTypes: number[];
+}
+
+// API Response interfaces (PascalCase)
+export interface EducationApiResponse {
+  Id: number;
+  EducationAttainmentType: string | number;
+  SchoolName: string;
+  Course?: string;
+  YearCompleted: number;
+  YearStarted: number;
+  IsHighestAttainment: boolean;
+  Notes?: string;
+  CreatedAt: string;
+  UpdatedAt?: string | null;
+  DurationInYears: number;
+  DisplayName: string;
+  YearRange: string;
+}
+
+// Form Data interfaces (camelCase)
+export interface Education {
+  educationAttainmentType: number;
+  schoolName: string;
+  course?: string;
+  yearCompleted: number;
+  yearStarted: number;
+  isHighestAttainment: boolean;
+  notes?: string;
+}
+
+// API Response interfaces (PascalCase)
+export interface IncomeApiResponse {
+  Id: number;
+  Source: string;
+  IncomeAmount: number;
+  IsPrimary: boolean;
+  CreatedAt: string;
+  UpdatedAt?: string | null;
+  FormattedIncome: string;
+  DisplayName: string;
+}
+
+// Form Data interfaces (camelCase)
+export interface Income {
+  source: string;
+  incomeAmount: number;
+  isPrimary: boolean;
+}
+
+// API Response interfaces (PascalCase)
+export interface FileAttachmentApiResponse {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  url?: string;
+}
+
+// Form Data interfaces (camelCase)
+export interface FileAttachment {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  file?: File;
+  url?: string;
+}
+
+// Create Member Request DTO
+export interface CreateMemberRequest {
+  firstName: string;
+  lastName: string;
+  middleName?: string;
+  dateOfBirth: string;
+  birthplace?: string;
+  genderType: number;
+  civilStatus: number;
+  tin?: string;
+  bodNumber?: string;
+  status: number;
+  membershipType: number;
+  membershipDate: string;
+  terminationDate?: string;
+  notes?: string;
+  addresses: Address[];
+  contactNumbers: ContactNumber[];
+  dependents: Dependent[];
+  educations: Education[];
+  incomes: Income[];
 }
 
 export interface MembersResponse {
@@ -51,41 +292,79 @@ export interface ApiError {
 }
 
 // Status and type enums for better type safety
-export enum MemberStatus {
-  PendingStatus = 0,
-  Active = 1,
-  Inactive = 2,
-  Suspended = 3,
-  Pending = 4,
-  Terminated = 5,
-  OnHold = 6,
-  Probationary = 7,
-  Honorary = 8,
-  Deceased = 9,
-  Other = 99
-}
 
-export enum MembershipType {
-  Member = 1
-}
-
+/**
+ * Represents the gender of a person
+ */
 export enum Gender {
+  /** Male */
   Male = 1,
+  /** Female */
   Female = 2,
+  /** Non-binary */
   NonBinary = 3,
+  /** Prefer not to say */
   PreferNotToSay = 4,
+  /** Other gender identity */
   Other = 5
 }
 
+/**
+ * Represents the civil status of a member
+ */
 export enum CivilStatus {
+  /** Single (never married) */
   Single = 1,
+  /** Married */
   Married = 2,
+  /** Widowed (spouse has passed away) */
   Widowed = 3,
+  /** Divorced */
   Divorced = 4,
+  /** Separated (legally separated but not divorced) */
   Separated = 5,
+  /** In a domestic partnership or civil union */
   DomesticPartnership = 6,
+  /** Annulled marriage */
   Annulled = 7,
+  /** Other civil status not listed */
   Other = 99
+}
+
+/**
+ * Represents the status of a cooperative member
+ */
+export enum MemberStatus {
+  /** Pending status (default for new members) */
+  PendingStatus = 0,
+  /** Active member */
+  Active = 1,
+  /** Inactive member */
+  Inactive = 2,
+  /** Suspended member */
+  Suspended = 3,
+  /** Pending approval */
+  Pending = 4,
+  /** Terminated membership */
+  Terminated = 5,
+  /** On hold */
+  OnHold = 6,
+  /** Probationary member */
+  Probationary = 7,
+  /** Honorary member */
+  Honorary = 8,
+  /** Deceased member */
+  Deceased = 9,
+  /** Other status */
+  Other = 99
+}
+
+/**
+ * Represents the type of membership in the cooperative
+ */
+export enum MembershipType {
+  /** Regular member */
+  Member = 1
 }
 
 // Helper functions for status display
@@ -237,17 +516,30 @@ export enum EducationAttainmentType {
   Other = 99
 }
 
-// Benefit Type Enum
+/**
+ * Types of benefits available to cooperative members
+ */
 export enum BenefitType {
+  /** Death benefit - paid to beneficiaries upon member's death */
   Death = 1,
+  /** Medicare benefit - covers medical expenses */
   Medicare = 2,
+  /** Disability benefit - paid when member becomes disabled */
   Disability = 3,
+  /** Life insurance benefit */
   LifeInsurance = 4,
+  /** Retirement benefit */
   Retirement = 5,
+  /** Education benefit - for member's education or dependents */
   Education = 6,
+  /** Housing benefit - for housing-related expenses */
   Housing = 7,
-  Livelihood = 8,
-  Other = 99
+  /** Emergency benefit - for emergency situations */
+  Emergency = 8,
+  /** Funeral benefit - for funeral expenses */
+  Funeral = 9,
+  /** Other miscellaneous benefits */
+  Other = 10
 }
 
 // Helper functions for the new enums
@@ -333,8 +625,10 @@ export const getBenefitTypeLabel = (type: number): string => {
       return 'Education Benefits';
     case BenefitType.Housing:
       return 'Housing Benefits';
-    case BenefitType.Livelihood:
-      return 'Livelihood Benefits';
+    case BenefitType.Emergency:
+      return 'Emergency Benefits';
+    case BenefitType.Funeral:
+      return 'Funeral Benefits';
     case BenefitType.Other:
       return 'Other Benefits';
     default:

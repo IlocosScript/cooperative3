@@ -1,5 +1,65 @@
 import axios from 'axios';
-import { Member, MembersResponse, MembersQueryParams, ApiError } from '../types/members';
+import { Member, MemberApiResponse, MembersResponse, MembersQueryParams, ApiError } from '../types/members';
+
+// Interface for the create member request payload
+interface CreateMemberRequest {
+  firstName: string;
+  lastName: string;
+  middleName?: string;
+  dateOfBirth: string;
+  birthplace?: string;
+  genderType: number;
+  civilStatus: number;
+  tin?: string;
+  bodNumber?: string;
+  status: number;
+  membershipType: number;
+  membershipDate: string;
+  terminationDate?: string;
+  notes?: string;
+  addresses: Array<{
+    addressType: number;
+    streetAddress1: string;
+    streetAddress2?: string;
+    city: string;
+    province: string;
+    postalCode: string;
+    country: string;
+    isPrimary: boolean;
+    isCurrent: boolean;
+    notes?: string;
+  }>;
+  contactNumbers: Array<{
+    phoneNumber: string;
+    isPrimary: boolean;
+  }>;
+  dependents: Array<{
+    firstName: string;
+    lastName: string;
+    middleName?: string;
+    relationship: number;
+    dateOfBirth: string;
+    genderType: number;
+    address?: string;
+    isDependent: boolean;
+    isBeneficiary: boolean;
+    benefitTypes: number[];
+  }>;
+  educations: Array<{
+    educationAttainmentType: number;
+    schoolName: string;
+    course?: string;
+    yearCompleted: number;
+    yearStarted: number;
+    isHighestAttainment: boolean;
+    notes?: string;
+  }>;
+  incomes: Array<{
+    source: string;
+    incomeAmount: number;
+    isPrimary: boolean;
+  }>;
+}
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.example.com';
 
@@ -72,9 +132,9 @@ export class MembersApiService {
   /**
    * Get a single member by ID
    */
-  static async getMember(id: number): Promise<Member> {
+  static async getMember(id: number): Promise<MemberApiResponse> {
     try {
-      const response = await apiClient.get<{ success: boolean; data: Member; message: string }>(
+      const response = await apiClient.get<{ success: boolean; data: MemberApiResponse; message: string }>(
         `/api/members/${id}`
       );
       return response.data.data;
@@ -89,16 +149,42 @@ export class MembersApiService {
   /**
    * Create a new member
    */
-  static async createMember(memberData: Partial<Member>): Promise<Member> {
+  static async createMember(memberData: CreateMemberRequest, files?: File[]): Promise<Member> {
     try {
-      const response = await apiClient.post<{ success: boolean; data: Member; message: string }>(
-        '/api/members',
-        memberData
-      );
+      let response;
+      
+      if (files && files.length > 0) {
+        // Use multipart/form-data for file uploads
+        const formData = new FormData();
+        formData.append('memberData', JSON.stringify(memberData));
+        
+        files.forEach((file) => {
+          formData.append('files', file);
+        });
+        
+        response = await apiClient.post<{ success: boolean; data: Member; message: string }>(
+          '/api/members',
+          formData,
+          {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          }
+        );
+      } else {
+        // Use JSON for requests without files
+        response = await apiClient.post<{ success: boolean; data: Member; message: string }>(
+          '/api/members',
+          memberData
+        );
+      }
+      
       return response.data.data;
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        throw new Error(error.response?.data?.message || 'Failed to create member');
+        const errorMessage = error.response?.data?.message || 'Failed to create member';
+        const errors = error.response?.data?.errors || [];
+        throw new Error(errors.length > 0 ? errors.join(', ') : errorMessage);
       }
       throw new Error('An unexpected error occurred');
     }
@@ -107,15 +193,21 @@ export class MembersApiService {
   /**
    * Update an existing member
    */
-  static async updateMember(id: number, memberData: Partial<Member>): Promise<Member> {
+  static async updateMember(id: number, memberData: any): Promise<MemberApiResponse> {
     try {
-      const response = await apiClient.put<{ success: boolean; data: Member; message: string }>(
+      console.log('API Service - Update request for member ID:', id);
+      console.log('API Service - Update payload:', memberData);
+      
+      const response = await apiClient.put<{ success: boolean; data: MemberApiResponse; message: string }>(
         `/api/members/${id}`,
         memberData
       );
+      
+      console.log('API Service - Update response:', response.data);
       return response.data.data;
     } catch (error) {
       if (axios.isAxiosError(error)) {
+        console.error('API Service - Update error:', error.response?.data);
         throw new Error(error.response?.data?.message || 'Failed to update member');
       }
       throw new Error('An unexpected error occurred');
