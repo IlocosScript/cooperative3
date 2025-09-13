@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import FileUploadApiService from '@/lib/services/fileUploadApi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -96,6 +97,7 @@ interface FileAttachment {
   size: number;
   type: string;
   file: File;
+  description?: string;
 }
 
 interface CreateMemberData {
@@ -180,11 +182,9 @@ const EDUCATION_ATTAINMENT_OPTIONS = Object.values(EducationAttainmentType)
   }));
 
 export default function CreateMemberModal({ isOpen, onClose, mode, memberData, onSubmit }: CreateMemberModalProps) {
-  console.log('CreateMemberModal rendered with:', { isOpen, mode, memberData: memberData ? 'has data' : 'no data' });
-  if (memberData && process.env.NODE_ENV === 'development') {
-    console.log('Full memberData object:', JSON.stringify(memberData, null, 2));
-  }
   const [isLoading, setIsLoading] = useState(false);
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
   const [currentStep, setCurrentStep] = useState(1);
   const [activeTab, setActiveTab] = useState('addresses');
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -234,31 +234,20 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
 
   const [formData, setFormData] = useState<CreateMemberData>(getInitialFormData());
 
+
   // Populate form data when in update mode
   useEffect(() => {
-    console.log('useEffect triggered - mode:', mode, 'memberData:', memberData);
-    console.log('memberData type:', typeof memberData);
-    console.log('memberData keys:', memberData ? Object.keys(memberData) : 'null');
-    console.log('Modal isOpen:', isOpen);
     
     // Only populate when modal is open and we have memberData
     if (isOpen && mode === 'update' && memberData) {
-      console.log('Populating form with member data:', memberData);
-      console.log('memberData.ContactNumbers:', memberData.ContactNumbers);
-      console.log('memberData.Addresses:', memberData.Addresses);
-      console.log('memberData.PrimaryContactNumber:', memberData.PrimaryContactNumber);
-      console.log('memberData.PrimaryAddress:', memberData.PrimaryAddress);
-      
       // Ensure we have proper contact numbers
       let contactNumbers: ContactNumber[] = [];
       if (Array.isArray(memberData.ContactNumbers) && memberData.ContactNumbers.length > 0) {
-        console.log('Using existing ContactNumbers:', memberData.ContactNumbers);
         contactNumbers = memberData.ContactNumbers.map(contact => ({
           phoneNumber: contact.PhoneNumber || '',
           isPrimary: contact.IsPrimary || false
         }));
       } else if (memberData.PrimaryContactNumber && memberData.PrimaryContactNumber.trim()) {
-        console.log('Creating contactNumbers from PrimaryContactNumber:', memberData.PrimaryContactNumber);
         contactNumbers = [
           {
             phoneNumber: memberData.PrimaryContactNumber,
@@ -266,7 +255,6 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
           }
         ];
       } else {
-        console.log('No contact numbers found, creating empty one');
         contactNumbers = [
           {
             phoneNumber: '',
@@ -277,14 +265,12 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
 
       // If we have contact numbers but they're empty, try to use PrimaryContactNumber
       if (contactNumbers.length > 0 && (!contactNumbers[0].phoneNumber || contactNumbers[0].phoneNumber.trim() === '') && memberData.PrimaryContactNumber && memberData.PrimaryContactNumber.trim()) {
-        console.log('Contact numbers are empty, using PrimaryContactNumber:', memberData.PrimaryContactNumber);
         contactNumbers[0].phoneNumber = memberData.PrimaryContactNumber;
       }
 
       // Ensure we have proper addresses
       let addresses: Address[] = [];
       if (Array.isArray(memberData.Addresses) && memberData.Addresses.length > 0) {
-        console.log('Using existing Addresses:', memberData.Addresses);
         addresses = memberData.Addresses.map(address => ({
           addressType: typeof address.AddressType === 'number' ? address.AddressType : AddressType.Home,
           streetAddress1: address.StreetAddress1 || '',
@@ -298,7 +284,6 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
           notes: address.Notes || ''
         }));
       } else if (memberData.PrimaryAddress && memberData.PrimaryAddress.trim()) {
-        console.log('Creating addresses from PrimaryAddress:', memberData.PrimaryAddress);
         addresses = [
           {
             addressType: AddressType.Home,
@@ -314,7 +299,6 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
           }
         ];
       } else {
-        console.log('No addresses found, creating empty one');
         addresses = [
           {
             addressType: AddressType.Home,
@@ -333,7 +317,6 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
 
       // If we have addresses but they're empty, try to use PrimaryAddress
       if (addresses.length > 0 && (!addresses[0].streetAddress1 || addresses[0].streetAddress1.trim() === '') && memberData.PrimaryAddress && memberData.PrimaryAddress.trim()) {
-        console.log('Addresses are empty, using PrimaryAddress:', memberData.PrimaryAddress);
         addresses[0].streetAddress1 = memberData.PrimaryAddress;
       }
 
@@ -460,10 +443,6 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
         addresses: addresses,
         contactNumbers: contactNumbers,
         dependents: memberData.Dependents ? memberData.Dependents.map(dependent => {
-          console.log('Processing dependent:', dependent);
-          console.log('Dependent relationship:', dependent.Relationship, '->', getRelationshipType(dependent.Relationship));
-          console.log('Dependent gender:', dependent.GenderType, '->', getGenderType(dependent.GenderType));
-          console.log('Dependent benefit types:', dependent.BenefitTypes, '->', getBenefitTypes(dependent.BenefitTypes));
           return {
             firstName: dependent.FirstName || '',
             lastName: dependent.LastName || '',
@@ -478,8 +457,6 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
           };
         }) : [],
         educations: memberData.Educations ? memberData.Educations.map(education => {
-          console.log('Processing education:', education);
-          console.log('Education attainment type:', education.EducationAttainmentType, '->', getEducationAttainmentType(education.EducationAttainmentType));
           return {
             educationAttainmentType: getEducationAttainmentType(education.EducationAttainmentType),
             schoolName: education.SchoolName || '',
@@ -504,27 +481,17 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
         })) : []
       };
       
-      console.log('Final form data being set:', updateData);
-      console.log('Contact numbers:', updateData.contactNumbers);
-      console.log('Addresses:', updateData.addresses);
-      console.log('Dependents:', updateData.dependents);
-      console.log('Educations:', updateData.educations);
-      console.log('Incomes:', updateData.incomes);
-      
+   
       // Force update the state by using a functional update
       setFormData(prevData => {
-        console.log('Previous form data:', prevData);
-        console.log('Setting new form data:', updateData);
         return updateData;
       });
       
-      console.log('Form data state set, checking in next render...');
       setCurrentStep(1);
       setErrors({});
       setApiError('');
     } else if (isOpen && mode === 'create') {
       // Reset form for create mode when modal opens
-      console.log('Resetting form for create mode');
       setFormData(getInitialFormData());
       setCurrentStep(1);
       setErrors({});
@@ -532,16 +499,6 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
     }
   }, [mode, memberData, isOpen]);
 
-  // Debug useEffect to log form data changes
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Form data updated:', formData);
-      console.log('Contact numbers in form:', formData.contactNumbers);
-      console.log('Addresses in form:', formData.addresses);
-      console.log('First name in form:', formData.firstName);
-      console.log('Last name in form:', formData.lastName);
-    }
-  }, [formData]);
 
   const updateFormData = (field: keyof CreateMemberData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -699,28 +656,72 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
     }));
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files) {
-      const newAttachments: FileAttachment[] = Array.from(files).map(file => ({
+      const newAttachments: FileAttachment[] = [];
+      
+      Array.from(files).forEach(file => {
+        // Use the centralized validation from FileUploadApiService
+        const validation = FileUploadApiService.validateFile(file);
+        
+        if (!validation.isValid) {
+          // Provide more user-friendly error messages
+          let userFriendlyError = validation.error || 'File validation failed';
+          
+          if (validation.error && validation.error.includes('exceeds') && validation.error.includes('MB')) {
+            userFriendlyError = `File size exceeds 10MB limit. Please choose a smaller file.`;
+          } else if (validation.error && validation.error.includes('File type not allowed')) {
+            userFriendlyError = `File type not supported. Please use PDF, JPG, JPEG, PNG, DOC, or DOCX files.`;
+          } else if (validation.error && validation.error.includes('cannot be empty')) {
+            userFriendlyError = `File is empty. Please choose a valid file.`;
+          }
+          
+          toast.error(`"${file.name}": ${userFriendlyError}`);
+          return;
+        }
+
+        newAttachments.push({
         id: Math.random().toString(36).substr(2, 9),
         name: file.name,
         size: file.size,
         type: file.type,
         file
-      }));
+        });
+      });
       
+      if (newAttachments.length > 0) {
       setFormData(prev => ({
         ...prev,
         fileAttachments: [...prev.fileAttachments, ...newAttachments]
       }));
+        toast.success(`${newAttachments.length} file(s) added successfully`);
     }
+    }
+    
+    // Clear the input to allow selecting the same files again
+    event.target.value = '';
   };
 
   const removeFile = (id: string) => {
+    const fileToRemove = formData.fileAttachments.find(file => file.id === id);
     setFormData(prev => ({
       ...prev,
       fileAttachments: prev.fileAttachments.filter(file => file.id !== id)
+    }));
+    
+    // Show toast notification for file removal
+    if (fileToRemove) {
+      toast.info(`File "${fileToRemove.name}" removed`);
+    }
+  };
+
+  const updateFileDescription = (id: string, description: string) => {
+    setFormData(prev => ({
+      ...prev,
+      fileAttachments: prev.fileAttachments.map(file => 
+        file.id === id ? { ...file, description } : file
+      )
     }));
   };
 
@@ -735,7 +736,6 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
   const handleSubmit = async () => {
     // Prevent double submission
     if (isLoading) {
-      console.log('Form submission already in progress, ignoring duplicate click');
       return;
     }
     
@@ -796,7 +796,6 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
         return;
       }
 
-      console.log('Starting form submission...');
 
       // Transform form data to match API structure
       const memberRequest: CreateMemberRequest = {
@@ -821,23 +820,16 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
         incomes: formData.incomes
       };
 
-      // Extract files from attachments
-      const files = formData.fileAttachments
-        .map(attachment => attachment.file)
-        .filter((file): file is File => file !== undefined);
-
-      console.log('Calling API with member request:', memberRequest);
-
-      // Import the API service
+      // Import the API services
       const MembersApiService = await import('@/lib/services/membersApi');
       
       let result: Member|MemberApiResponse;
+      let memberId: number;
       
       if (mode === 'create') {
-        // Call the API to create member
-        result = await MembersApiService.default.createMember(memberRequest, files);
-        console.log('Member created successfully:', result);
-        toast.success('Member created successfully!');
+        // Call the API to create member (without files)
+        result = await MembersApiService.default.createMember(memberRequest);
+        memberId = (result as Member).Id;
       } else {
         // Call the API to update member
         if (!memberData?.Id) {
@@ -845,11 +837,6 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
         }
         
         // Transform form data to match API update format (camelCase)
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Original memberData for update:', memberData);
-          console.log('Form data to be sent:', memberRequest);
-        }
-        
         const updateRequest = {
           firstName: memberRequest.firstName,
           lastName: memberRequest.lastName,
@@ -934,14 +921,79 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
           })
         };
         
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Sending update request:', updateRequest);
-        }
         result = await MembersApiService.default.updateMember(memberData.Id, updateRequest);
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Member updated successfully:', result);
+        memberId = memberData.Id;
+      }
+
+      // Upload files using the new file upload API if there are files to upload
+      if (formData.fileAttachments.length > 0) {
+        console.log("Files FIles", formData.fileAttachments);
+        // Show immediate feedback that files will be uploaded
+        toast.info(`Found ${formData.fileAttachments.length} file(s) to upload`);
+        setIsUploadingFiles(true);
+        setUploadProgress({});
+        
+        // Show upload start notification
+        toast.info(`Starting upload of ${formData.fileAttachments.length} file(s)...`);
+        
+        try {
+          // Get current user (you might want to get this from your auth context)
+          // For now, using a placeholder - replace with actual user from auth context
+          const uploadedBy = localStorage.getItem('current-user') || 'system-user';
+          
+          // Extract files and descriptions for multi-file upload
+          const files = formData.fileAttachments.map(attachment => attachment.file);
+          const descriptions = formData.fileAttachments.map(attachment => 
+            attachment.description || `Member document - ${attachment.name}`
+          );
+
+          // Verify files are valid
+          if (files.length === 0 || files.some(file => !file)) {
+            throw new Error('No valid files found for upload');
+          }
+    
+          // Upload all files at once using the new multi-file upload endpoint
+          const uploadResults = await FileUploadApiService.uploadMultipleFileAttachments(
+            files,
+            1, // EntityType: 1 = Member
+            memberId,
+            uploadedBy,
+            descriptions
+          );
+          
+          toast.success(`Member ${mode === 'create' ? 'created' : 'updated'} and ${formData.fileAttachments.length} file(s) uploaded successfully!`);
+        } catch (error) {
+          console.error('Error uploading files:', error);
+          
+          // Parse error message to provide more specific feedback
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          
+          // Check if it's a partial success (some files uploaded)
+          if (errorMessage.includes('uploaded successfully')) {
+            toast.warning(`Member ${mode === 'create' ? 'created' : 'updated'} successfully, but some files failed to upload. ${errorMessage}`);
+          } else if (errorMessage.includes('At least one file is required')) {
+            toast.error('No files were selected for upload. Please select at least one file.');
+          } else if (errorMessage.includes('File size exceeds')) {
+            toast.error('Upload failed: One or more files exceed the 10MB size limit. Please check your files and try again.');
+          } else if (errorMessage.includes('File type not allowed')) {
+            toast.error('Upload failed: One or more files are not in the allowed format. Please use PDF, JPG, JPEG, PNG, DOC, or DOCX files only.');
+          } else if (errorMessage.includes('File cannot be empty')) {
+            toast.error('Upload failed: One or more files are empty. Please check your files and try again.');
+          } else if (errorMessage.includes('network') || errorMessage.includes('connection')) {
+            toast.error('Upload failed: Network connection error. Please check your internet connection and try again.');
+          } else if (errorMessage.includes('timeout')) {
+            toast.error('Upload failed: Request timed out. Please try again with smaller files or check your connection.');
+          } else {
+            // Generic error message
+            toast.error(`Member ${mode === 'create' ? 'created' : 'updated'} successfully, but file upload failed: ${errorMessage}`);
+          }
+        } finally {
+          setIsUploadingFiles(false);
+          setUploadProgress({});
         }
-        toast.success('Member updated successfully!');
+      } else {
+        // No files to upload, just show success message
+        toast.success(`Member ${mode === 'create' ? 'created' : 'updated'} successfully!`);
       }
       
       // Call onSubmit callback with the result
@@ -2001,14 +2053,16 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
             className="hidden"
           />
         </div>
+        
       </div>
 
       {formData.fileAttachments.length > 0 && (
         <div>
-          <h4 className="text-md font-medium mb-3">Uploaded Files</h4>
-          <div className="space-y-2">
+          <h4 className="text-md font-medium mb-3">Uploaded Files ({formData.fileAttachments.length})</h4>
+          <div className="space-y-4">
             {formData.fileAttachments.map((file) => (
-              <div key={file.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div key={file.id} className="p-4 bg-gray-50 rounded-lg border">
+                <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center space-x-3">
                   <FileText className="w-5 h-5 text-gray-400" />
                   <div>
@@ -2024,6 +2078,19 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
                 >
                   <X className="w-4 h-4" />
                 </Button>
+                </div>
+                <div>
+                  <Label htmlFor={`file-description-${file.id}`} className="text-sm font-medium">
+                    Description (Optional)
+                  </Label>
+                  <Input
+                    id={`file-description-${file.id}`}
+                    value={file.description || ''}
+                    onChange={(e) => updateFileDescription(file.id, e.target.value)}
+                    placeholder="Enter a description for this file..."
+                    className="mt-1"
+                  />
+                </div>
               </div>
             ))}
           </div>
@@ -2074,7 +2141,6 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
-      console.log('Dialog onOpenChange called with:', open);
       if (!open) {
         onClose();
       }

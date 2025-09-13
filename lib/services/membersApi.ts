@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { apiClient, handleApiResponse, handleApiError } from '../config/apiClient';
 import { Member, MemberApiResponse, MembersResponse, MembersQueryParams, ApiError } from '../types/members';
 
 // Interface for the create member request payload
@@ -61,40 +62,7 @@ interface CreateMemberRequest {
   }>;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.example.com';
-
-// Create axios instance with base configuration
-const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Request interceptor for adding auth tokens if needed
-apiClient.interceptors.request.use(
-  (config) => {
-    // Add auth token if available
-    const token = localStorage.getItem('auth-token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// Response interceptor for error handling
-apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    console.error('API Error:', error);
-    return Promise.reject(error);
-  }
-);
+// Using shared apiClient from config
 
 export class MembersApiService {
   /**
@@ -113,7 +81,7 @@ export class MembersApiService {
       };
       
       console.log('API Service - Request params:', requestParams);
-      console.log('API Service - Full URL:', `${API_BASE_URL}/api/members`);
+      console.log('API Service - Full URL:', `${apiClient.defaults.baseURL}/api/members`);
       
       const response = await apiClient.get<MembersResponse>('/api/members', {
         params: requestParams,
@@ -122,10 +90,7 @@ export class MembersApiService {
       console.log('API Service - Raw response:', response);
       return response.data;
     } catch (error) {
-      if (axios.isAxiosError(error)) {
-        throw new Error(error.response?.data?.message || 'Failed to fetch members');
-      }
-      throw new Error('An unexpected error occurred');
+      throw new Error(handleApiError(error));
     }
   }
 
@@ -137,56 +102,35 @@ export class MembersApiService {
       const response = await apiClient.get<{ success: boolean; data: MemberApiResponse; message: string }>(
         `/api/members/${id}`
       );
-      return response.data.data;
+      return handleApiResponse(response);
     } catch (error) {
-      if (axios.isAxiosError(error)) {
-        throw new Error(error.response?.data?.message || 'Failed to fetch member');
-      }
-      throw new Error('An unexpected error occurred');
+      throw new Error(handleApiError(error));
     }
   }
 
   /**
    * Create a new member
    */
-  static async createMember(memberData: CreateMemberRequest, files?: File[]): Promise<Member> {
+  static async createMember(memberData: CreateMemberRequest): Promise<Member> {
     try {
-      let response;
+      const response = await apiClient.post<{ success: boolean; data: Member; message: string }>(
+        '/api/members',
+        memberData,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
       
-      if (files && files.length > 0) {
-        // Use multipart/form-data for file uploads
-        const formData = new FormData();
-        formData.append('memberData', JSON.stringify(memberData));
-        
-        files.forEach((file) => {
-          formData.append('files', file);
-        });
-        
-        response = await apiClient.post<{ success: boolean; data: Member; message: string }>(
-          '/api/members',
-          formData,
-          {
-            headers: {
-              'Content-Type': 'multipart/form-data',
-            },
-          }
-        );
-      } else {
-        // Use JSON for requests without files
-        response = await apiClient.post<{ success: boolean; data: Member; message: string }>(
-          '/api/members',
-          memberData
-        );
-      }
-      
-      return response.data.data;
+      return handleApiResponse(response);
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const errorMessage = error.response?.data?.message || 'Failed to create member';
         const errors = error.response?.data?.errors || [];
         throw new Error(errors.length > 0 ? errors.join(', ') : errorMessage);
       }
-      throw new Error('An unexpected error occurred');
+      throw new Error(handleApiError(error));
     }
   }
 
@@ -204,13 +148,13 @@ export class MembersApiService {
       );
       
       console.log('API Service - Update response:', response.data);
-      return response.data.data;
+      return handleApiResponse(response);
     } catch (error) {
       if (axios.isAxiosError(error)) {
         console.error('API Service - Update error:', error.response?.data);
         throw new Error(error.response?.data?.message || 'Failed to update member');
       }
-      throw new Error('An unexpected error occurred');
+      throw new Error(handleApiError(error));
     }
   }
 
@@ -221,10 +165,7 @@ export class MembersApiService {
     try {
       await apiClient.delete(`/api/members/${id}`);
     } catch (error) {
-      if (axios.isAxiosError(error)) {
-        throw new Error(error.response?.data?.message || 'Failed to delete member');
-      }
-      throw new Error('An unexpected error occurred');
+      throw new Error(handleApiError(error));
     }
   }
 
@@ -248,6 +189,7 @@ export class MembersApiService {
   static async getMembersByType(membershipType: number, params: Omit<MembersQueryParams, 'membershipType'> = {}): Promise<MembersResponse> {
     return this.getMembers({ ...params, membershipType });
   }
+
 }
 
 // Export default instance
