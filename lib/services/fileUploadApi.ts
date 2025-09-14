@@ -103,13 +103,10 @@ export class FileUploadApiService {
         data: FileUploadResponse;
         message: string;
       }>('/api/attachments/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        // Let axios automatically set Content-Type with boundary
         onUploadProgress: (progressEvent) => {
           // You can emit progress events here if needed
           const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total!);
-          console.log(`Upload Progress: ${percentCompleted}%`);
         },
       });
 
@@ -146,32 +143,12 @@ export class FileUploadApiService {
 
       const formData = new FormData();
       
-      // Add all files
+      // Add all files - try different approaches
       files.forEach((file, index) => {
-        console.log(`File ${index}:`, {
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          lastModified: file.lastModified,
-          isFile: file instanceof File,
-          constructor: file.constructor.name
-        });
         
-        // Check if file has actual content
-        if (file.size === 0) {
-          console.log(`WARNING: File ${index} has 0 size!`);
-        }
-        
-        // Try to read a small portion of the file to verify it has content
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          const arrayBuffer = e.target?.result;
-          console.log(`File ${index} content preview:`, arrayBuffer ? 'Has content' : 'No content');
-        };
-        reader.readAsArrayBuffer(file.slice(0, 100)); // Read first 100 bytes
-        
+        // Method 1: Append with same key (for List<IFormFile>)
         formData.append("Files", file);
-        console.log(`File[${index}] added to FormData`);
+       
       });
       
       // Add metadata
@@ -187,9 +164,7 @@ export class FileUploadApiService {
           }
         });
       }
-      console.log("FormData", formData);
-      console.log("FormData entries after adding files:");
-   
+      
       
       const response = await uploadClient.post<{
         success: boolean;
@@ -198,13 +173,12 @@ export class FileUploadApiService {
         errors?: string[];
       }>('/api/attachments/upload-multiple', formData, {
         headers: {
-          'Content-Type': 'multipart/form-data',
+          //'Content-Type': 'multipart/form-data',
         },
         onUploadProgress: (progressEvent) => {
           const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total!);
         },
       });
-
       // Handle response - check for partial success
       if (response.data.success) {
         return response.data.data;
@@ -295,7 +269,6 @@ export class FileUploadApiService {
         },
         onUploadProgress: (progressEvent) => {
           const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total!);
-          console.log(`Multi-file Upload Progress: ${percentCompleted}%`);
           
           // Update progress for all files
           if (onProgress) {

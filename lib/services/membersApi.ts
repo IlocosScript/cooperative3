@@ -80,14 +80,11 @@ export class MembersApiService {
         ...(params.sortDirection && { sortDirection: params.sortDirection }),
       };
       
-      console.log('API Service - Request params:', requestParams);
-      console.log('API Service - Full URL:', `${apiClient.defaults.baseURL}/api/members`);
       
       const response = await apiClient.get<MembersResponse>('/api/members', {
         params: requestParams,
       });
       
-      console.log('API Service - Raw response:', response);
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error));
@@ -139,19 +136,15 @@ export class MembersApiService {
    */
   static async updateMember(id: number, memberData: any): Promise<MemberApiResponse> {
     try {
-      console.log('API Service - Update request for member ID:', id);
-      console.log('API Service - Update payload:', memberData);
       
       const response = await apiClient.put<{ success: boolean; data: MemberApiResponse; message: string }>(
         `/api/members/${id}`,
         memberData
       );
       
-      console.log('API Service - Update response:', response.data);
       return handleApiResponse(response);
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        console.error('API Service - Update error:', error.response?.data);
         throw new Error(error.response?.data?.message || 'Failed to update member');
       }
       throw new Error(handleApiError(error));

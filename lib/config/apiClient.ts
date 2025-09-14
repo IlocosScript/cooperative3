@@ -20,11 +20,13 @@ const requestInterceptor = (config: AxiosRequestConfig) => {
     };
   }
 
-  // Add common headers
-  config.headers = {
-    ...config.headers,
-    'Content-Type': 'application/json',
-  };
+  // Add common headers only if not FormData (FormData needs its own Content-Type)
+  if (!(config.data instanceof FormData)) {
+    config.headers = {
+      ...config.headers,
+      'Content-Type': 'application/json',
+    };
+  }
 
   return config;
 };
@@ -62,9 +64,7 @@ const createApiClient = (timeout: number = API_CONFIG.TIMEOUT): AxiosInstance =>
   const client = axios.create({
     baseURL: API_CONFIG.BASE_URL,
     timeout,
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    // Don't set default Content-Type here - let the interceptor handle it
   });
 
   // Add request interceptor
@@ -87,9 +87,7 @@ export const createCustomApiClient = (config: Partial<AxiosRequestConfig> = {}):
   const customClient = axios.create({
     baseURL: API_CONFIG.BASE_URL,
     timeout: API_CONFIG.TIMEOUT,
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    // Don't set default Content-Type here - let the interceptor handle it
     ...config,
   });
 

@@ -219,10 +219,16 @@ export interface Income {
 
 // API Response interfaces (PascalCase)
 export interface FileAttachmentApiResponse {
-  id: string;
-  name: string;
-  size: number;
-  type: string;
+  Id: number;
+  FileName: string;
+  OriginalFileName: string;
+  FileSize: number;
+  ContentType: string;
+  Description?: string;
+  UploadedBy: string;
+  UploadDate: string;
+  CreatedDate: string;
+  ModifiedDate?: string | null;
   url?: string;
 }
 
@@ -232,6 +238,7 @@ export interface FileAttachment {
   name: string;
   size: number;
   type: string;
+  description?: string;
   file?: File;
   url?: string;
 }
@@ -257,6 +264,11 @@ export interface CreateMemberRequest {
   dependents: Dependent[];
   educations: Education[];
   incomes: Income[];
+  attachments?: {
+    id: number;
+    fileName: string;
+    description?: string;
+  }[];
 }
 
 export interface MembersResponse {

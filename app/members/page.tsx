@@ -82,7 +82,6 @@ export default function MembersPage() {
       ...params
     };
     
-    console.log('API Parameters being sent:', apiParams);
     
     try {
       const response = await MembersApiService.getMembers(apiParams);
@@ -98,7 +97,6 @@ export default function MembersPage() {
      
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch members');
-      console.error('Error fetching members:', err);
       setMembers([]);
       setTotalCount(0);
       setTotalPages(0);
@@ -106,7 +104,6 @@ export default function MembersPage() {
       setHasPreviousPage(false);
     } finally {
       setIsLoading(false);
-      console.log('Members:',members);  
     }
   };
 
@@ -115,7 +112,6 @@ export default function MembersPage() {
     const userData = localStorage.getItem('cooperative-user');
     if (userData) {
       setUser(JSON.parse(userData));
-      console.log('Starting to fetch members...');
       fetchMembers();
     } else {
       router.push('/');
@@ -152,11 +148,9 @@ export default function MembersPage() {
       fetchMembers();
       
       // Show success message (you can add a toast notification here)
-      console.log('Member created successfully:', data);
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create member');
-      console.error('Error creating member:', err);
     } finally {
       setIsLoading(false);
     }
@@ -170,11 +164,9 @@ export default function MembersPage() {
       fetchMembers();
       
       // Show success message
-      console.log('Member updated successfully:', data);
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update member');
-      console.error('Error updating member:', err);
     } finally {
       setIsLoading(false);
     }
@@ -183,27 +175,16 @@ export default function MembersPage() {
   const handleEditMember = async (member: Member) => {
     try {
       setIsLoading(true);
-      console.log('Fetching complete member data for ID:', member.Id);
-      console.log('Original member data from list:', member);
       
       // Fetch complete member data using the member ID
       const completeMemberData = await MembersApiService.getMember(member.Id);
-      console.log('Complete member data received:', completeMemberData);
-      console.log('Has addresses:', !!completeMemberData.Addresses, 'Count:', completeMemberData.Addresses?.length);
-      console.log('Has contactNumbers:', !!completeMemberData.ContactNumbers, 'Count:', completeMemberData.ContactNumbers?.length);
-      console.log('Has dependents:', !!completeMemberData.Dependents, 'Count:', completeMemberData.Dependents?.length);
       
       // Set the complete member data for the update modal
-      console.log('Setting selectedMember for modal:', completeMemberData);
-      console.log('SelectedMember addresses:', completeMemberData.Addresses);
-      console.log('SelectedMember contactNumbers:', completeMemberData.ContactNumbers);
       setSelectedMember(completeMemberData);
-      console.log('Opening update modal...');
       setIsUpdateDialogOpen(true);
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch member details');
-      console.error('Error fetching member details:', err);
     } finally {
       setIsLoading(false);
     }
@@ -557,7 +538,6 @@ export default function MembersPage() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => {
-                                  console.log('Selected member data:', member);
                                   setSelectedMember(member);
                                   setIsViewDialogOpen(true);
                                 }}
@@ -658,7 +638,6 @@ export default function MembersPage() {
            key={`update-${selectedMember?.Id || 'new'}`}
            isOpen={isUpdateDialogOpen}
            onClose={() => {
-             console.log('Closing update modal');
              setIsUpdateDialogOpen(false);
            }}
            mode="update"

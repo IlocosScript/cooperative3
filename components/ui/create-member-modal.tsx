@@ -473,11 +473,12 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
           isPrimary: income.IsPrimary || false
         })) : [],
         fileAttachments: memberData.Attachments ? memberData.Attachments.map(att => ({
-          id: att.id || '',
-          name: att.name || '',
-          size: att.size || 0,
-          type: att.type || '',
-          file: new File([], att.name || '') // API response doesn't have file property
+          id: att.Id.toString(),
+          name: att.OriginalFileName || '',
+          size: att.FileSize || 0,
+          type: att.ContentType || '',
+          description: att.Description || '',
+          file: new File([], att.OriginalFileName || '') // API response doesn't have file property
         })) : []
       };
       
@@ -681,6 +682,7 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
           return;
         }
 
+        
         newAttachments.push({
         id: Math.random().toString(36).substr(2, 9),
         name: file.name,
@@ -918,7 +920,16 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
               incomeAmount: income.incomeAmount,
               isPrimary: income.isPrimary
             };
-          })
+          }),
+          // Include list of existing attachments that should be kept
+          // This allows the server to know which attachments to delete (those not in this list)
+          attachments: formData.fileAttachments
+            .filter(attachment => !attachment.file || attachment.file.size === 0) // Only existing attachments (no File object)
+            .map(attachment => ({
+              id: parseInt(attachment.id), // Convert string ID back to number
+              fileName: attachment.name,
+              description: attachment.description || ''
+            }))
         };
         
         result = await MembersApiService.default.updateMember(memberData.Id, updateRequest);
@@ -927,14 +938,24 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
 
       // Upload files using the new file upload API if there are files to upload
       if (formData.fileAttachments.length > 0) {
-        console.log("Files FIles", formData.fileAttachments);
-        // Show immediate feedback that files will be uploaded
-        toast.info(`Found ${formData.fileAttachments.length} file(s) to upload`);
+        // Show immediate feedback about file attachments
+        const existingFilesCount = formData.fileAttachments.filter(attachment => !attachment.file || attachment.file.size === 0).length;
+        const newFilesCount = formData.fileAttachments.filter(attachment => attachment.file && attachment.file.size > 0).length;
+        
+        if (existingFilesCount > 0 && newFilesCount > 0) {
+          toast.info(`Found ${existingFilesCount} existing attachment(s) and ${newFilesCount} new file(s) to upload`);
+        } else if (existingFilesCount > 0) {
+          toast.info(`Found ${existingFilesCount} existing attachment(s) to manage`);
+        } else if (newFilesCount > 0) {
+          toast.info(`Found ${newFilesCount} new file(s) to upload`);
+        }
         setIsUploadingFiles(true);
         setUploadProgress({});
         
         // Show upload start notification
-        toast.info(`Starting upload of ${formData.fileAttachments.length} file(s)...`);
+        if (newFilesCount > 0) {
+          toast.info(`Starting upload of ${newFilesCount} new file(s)...`);
+        }
         
         try {
           // Get current user (you might want to get this from your auth context)
@@ -942,15 +963,21 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
           const uploadedBy = localStorage.getItem('current-user') || 'system-user';
           
           // Extract files and descriptions for multi-file upload
-          const files = formData.fileAttachments.map(attachment => attachment.file);
-          const descriptions = formData.fileAttachments.map(attachment => 
-            attachment.description || `Member document - ${attachment.name}`
-          );
+          const files = formData.fileAttachments
+            .filter(attachment => attachment.file && attachment.file.size > 0) // Only include valid files
+            .map(attachment => attachment.file!);
+          const descriptions = formData.fileAttachments
+            .filter(attachment => attachment.file && attachment.file.size > 0) // Match the same filter
+            .map(attachment => 
+              attachment.description || `Member document - ${attachment.name}`
+            );
 
-          // Verify files are valid
-          if (files.length === 0 || files.some(file => !file)) {
-            throw new Error('No valid files found for upload');
-          }
+
+          // Check if there are new files to upload
+          if (files.length === 0) {
+            // No new files to upload, but existing files are already displayed
+            toast.info('No new files to upload - existing attachments are preserved');
+          } else {
     
           // Upload all files at once using the new multi-file upload endpoint
           const uploadResults = await FileUploadApiService.uploadMultipleFileAttachments(
@@ -961,9 +988,13 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
             descriptions
           );
           
-          toast.success(`Member ${mode === 'create' ? 'created' : 'updated'} and ${formData.fileAttachments.length} file(s) uploaded successfully!`);
+          
+            const successMessage = mode === 'create' 
+              ? `Member created and ${files.length} file(s) uploaded successfully!`
+              : `Member updated with ${existingFilesCount} existing attachment(s) and ${files.length} new file(s) uploaded successfully!`;
+            toast.success(successMessage);
+          }
         } catch (error) {
-          console.error('Error uploading files:', error);
           
           // Parse error message to provide more specific feedback
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -1048,7 +1079,6 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
       setApiError('');
       onClose();
     } catch (error) {
-      console.error('Error creating member:', error);
       
       // Handle API errors
       if (error instanceof Error) {
@@ -1111,6 +1141,18 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
           });
         }
         break;
+      case 3:
+        // Dependents step - no required validation, can be empty
+        break;
+      case 4:
+        // Education step - no required validation, can be empty
+        break;
+      case 5:
+        // Income step - no required validation, can be empty
+        break;
+      case 6:
+        // File attachments step - no required validation, can be empty
+        break;
     }
     
     setErrors(validationErrors);
@@ -1125,6 +1167,95 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
     }
   };
   const prevStep = () => setCurrentStep(prev => Math.max(prev - 1, 1));
+
+  // Navigate to a specific step
+  const goToStep = (step: number) => {
+    // In update mode, allow navigation to any step
+    // In create mode, only allow navigation to current step or previous valid steps
+    if (mode === 'update') {
+      setCurrentStep(step);
+    } else {
+      // In create mode, only allow going to current step or previous steps
+      if (step <= currentStep) {
+        setCurrentStep(step);
+      } else {
+        // For future steps, validate all previous steps first
+        let canNavigate = true;
+        for (let i = 1; i < step; i++) {
+          if (!isStepValid(i)) {
+            canNavigate = false;
+            break;
+          }
+        }
+        if (canNavigate) {
+          setCurrentStep(step);
+        } else {
+          toast.error('Please complete all previous steps before navigating to this step');
+        }
+      }
+    }
+  };
+
+  // Check if a specific step is valid
+  const isStepValid = (step: number) => {
+    const validationErrors: { [key: string]: string } = {};
+    
+    switch (step) {
+      case 1:
+        if (!formData.firstName.trim()) validationErrors.firstName = 'Required';
+        if (!formData.lastName.trim()) validationErrors.lastName = 'Required';
+        if (!formData.dateOfBirth) validationErrors.dateOfBirth = 'Required';
+        if (!formData.membershipDate) validationErrors.membershipDate = 'Required';
+        if (formData.contactNumbers.length === 0) {
+          validationErrors.contactNumbers = 'Required';
+        } else {
+          formData.contactNumbers.forEach((contact, index) => {
+            if (!contact.phoneNumber.trim()) {
+              validationErrors[`contactNumbers.${index}.phoneNumber`] = 'Required';
+            }
+          });
+        }
+        break;
+      case 2:
+        if (formData.addresses.length === 0) {
+          validationErrors.addresses = 'Required';
+        } else {
+          formData.addresses.forEach((address, index) => {
+            if (!address.streetAddress1.trim()) {
+              validationErrors[`addresses.${index}.streetAddress1`] = 'Required';
+            }
+            if (!address.city.trim()) {
+              validationErrors[`addresses.${index}.city`] = 'Required';
+            }
+            if (!address.province.trim()) {
+              validationErrors[`addresses.${index}.province`] = 'Required';
+            }
+          });
+        }
+        break;
+      case 3:
+      case 4:
+      case 5:
+      case 6:
+        // These steps are optional, always valid
+        break;
+    }
+    
+    return Object.keys(validationErrors).length === 0;
+  };
+
+  // Handle keyboard navigation
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'Tab' && !event.shiftKey) {
+      // Tab key pressed - try to go to next step
+      event.preventDefault();
+      nextStep();
+    } else if (event.key === 'Tab' && event.shiftKey) {
+      // Shift+Tab pressed - go to previous step
+      event.preventDefault();
+      prevStep();
+    }
+  };
 
   // Function to make API errors more user-friendly
   const makeErrorUserFriendly = (errorMessage: string): string => {
@@ -2058,7 +2189,9 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
 
       {formData.fileAttachments.length > 0 && (
         <div>
-          <h4 className="text-md font-medium mb-3">Uploaded Files ({formData.fileAttachments.length})</h4>
+          <h4 className="text-md font-medium mb-3">
+            {mode === 'create' ? 'Uploaded Files' : 'File Attachments'} ({formData.fileAttachments.length})
+          </h4>
           <div className="space-y-4">
             {formData.fileAttachments.map((file) => (
               <div key={file.id} className="p-4 bg-gray-50 rounded-lg border">
@@ -2066,7 +2199,14 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
                 <div className="flex items-center space-x-3">
                   <FileText className="w-5 h-5 text-gray-400" />
                   <div>
-                    <p className="font-medium text-sm">{file.name}</p>
+                    <div className="flex items-center space-x-2">
+                      <p className="font-medium text-sm">{file.name}</p>
+                      {!file.file || file.file.size === 0 ? (
+                        <Badge variant="outline" className="text-xs">Existing</Badge>
+                      ) : (
+                        <Badge variant="secondary" className="text-xs">New</Badge>
+                      )}
+                    </div>
                     <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
                   </div>
                 </div>
@@ -2145,7 +2285,11 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
         onClose();
       }
     }}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent 
+        className="max-w-4xl max-h-[90vh] overflow-y-auto"
+        onKeyDown={handleKeyDown}
+        tabIndex={0}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center">
             {mode === 'create' ? (
@@ -2165,21 +2309,60 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
                            {/* Step Indicator */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex space-x-2">
-              {[1, 2, 3, 4, 5, 6].map((step) => (
-                <div
-                  key={step}
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                    step <= currentStep
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-200 text-gray-600'
-                  }`}
-                >
-                  {step}
-                </div>
-              ))}
+              {[1, 2, 3, 4, 5, 6].map((step) => {
+                const isValid = isStepValid(step);
+                const isCurrent = step === currentStep;
+                const isCompleted = step < currentStep;
+                const isAccessible = mode === 'update' || step <= currentStep || (step > currentStep && isValid);
+                
+                let stepClass = 'w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors duration-200 ';
+                
+                if (isCurrent) {
+                  stepClass += isValid ? 'bg-green-600 text-white' : 'bg-red-500 text-white';
+                } else if (isCompleted) {
+                  stepClass += 'bg-blue-600 text-white';
+                } else if (isAccessible) {
+                  stepClass += 'bg-gray-300 text-gray-700 hover:bg-gray-400';
+                } else {
+                  stepClass += 'bg-gray-200 text-gray-500';
+                }
+                
+                // Add cursor pointer for clickable steps
+                if (isAccessible) {
+                  stepClass += ' cursor-pointer';
+                }
+                
+                const handleClick = () => {
+                  if (isAccessible) {
+                    goToStep(step);
+                  }
+                };
+                
+                return (
+                  <div 
+                    key={step} 
+                    className={stepClass} 
+                    title={
+                      isCurrent 
+                        ? (isValid ? 'Current step - Valid' : 'Current step - Invalid') 
+                        : isCompleted 
+                        ? 'Completed step - Click to go back'
+                        : isAccessible 
+                        ? `Step ${step} - Click to navigate`
+                        : 'Complete previous steps first'
+                    }
+                    onClick={handleClick}
+                  >
+                    {step}
+                  </div>
+                );
+              })}
             </div>
             <div className="text-sm text-gray-500">
               Step {currentStep} of 6
+              <div className="text-xs text-gray-400 mt-1">
+                Use Tab to go to next step, Shift+Tab for previous step, or click on step numbers
+              </div>
             </div>
           </div>
 
