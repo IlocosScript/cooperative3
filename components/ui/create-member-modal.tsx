@@ -110,6 +110,7 @@ interface CreateMemberData {
   civilStatus: number;
   tin: string;
   bodNumber?: string;
+  memberNumber?: string;
   status: number;
   membershipType: number;
   membershipDate: string;
@@ -201,6 +202,7 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
     civilStatus: CivilStatus.Single,
     tin: '',
     bodNumber: '',
+    memberNumber: '',
     status: MemberStatus.PendingStatus,
     membershipType: MembershipType.Member,
     membershipDate: new Date().toISOString(),
@@ -435,6 +437,7 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
         civilStatus: getCivilStatus(memberData.CivilStatus),
         tin: memberData.Tin || '',
         bodNumber: memberData.BodNumber || '',
+        memberNumber: memberData.MemberNumber || '',
         status: getStatus(memberData.Status),
         membershipType: getMembershipType(memberData.MembershipType),
         membershipDate: memberData.MembershipDate || new Date().toISOString(),
@@ -810,6 +813,7 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
         civilStatus: formData.civilStatus,
         tin: formData.tin || '',
         bodNumber: formData.bodNumber || '',
+        memberNumber: formData.memberNumber || '',
         status: formData.status,
         membershipType: formData.membershipType,
         membershipDate: formData.membershipDate,
@@ -1044,6 +1048,7 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
         civilStatus: CivilStatus.Single,
         tin: '',
         bodNumber: '',
+        memberNumber: '',
         status: MemberStatus.PendingStatus,
         membershipType: MembershipType.Member,
         membershipDate: new Date().toISOString(),
@@ -1446,7 +1451,7 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
         </div>
       </div>
 
-             <div className="grid grid-cols-2 gap-4">
+             <div className="grid grid-cols-3 gap-4">
          <div>
            <Label htmlFor="membershipType">Membership Type *</Label>
            <Select value={formData.membershipType?.toString() || ''} onValueChange={(value) => updateFormData('membershipType', parseInt(value))}>
@@ -1461,6 +1466,15 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
                ))}
              </SelectContent>
            </Select>
+         </div>
+         <div>
+           <Label htmlFor="memberNumber">Member Number</Label>
+           <Input
+             id="memberNumber"
+             value={formData.memberNumber || ''}
+             onChange={(e) => updateFormData('memberNumber', e.target.value)}
+             placeholder="e.g., MEM001"
+           />
          </div>
          <div>
            <Label htmlFor="bodNumber">BOD Number</Label>

@@ -254,6 +254,7 @@ export interface CreateMemberRequest {
   civilStatus: number;
   tin?: string;
   bodNumber?: string;
+  memberNumber?: string;
   status: number;
   membershipType: number;
   membershipDate: string;
