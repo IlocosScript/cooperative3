@@ -120,50 +120,56 @@ export class FileUploadApiService {
    * Upload multiple file attachments using the new multi-file upload endpoint
    */
   static async uploadMultipleFileAttachments(
-    files: File[],
+    attachments: Array<{
+      file?: File;
+      description?: string;
+      attachmentType: string;
+    }>,
     entityType: number,
     entityId: number,
     uploadedBy: string,
-    descriptions?: string[],
     validationOptions?: FileValidationOptions
   ): Promise<FileUploadResponse[]> {
     try {
       // Validate all files first
-      for (const file of files) {
-        const validation = this.validateFile(file, validationOptions);
-        if (!validation.isValid) {
-          throw new Error(`File "${file.name}": ${validation.error}`);
+      for (const attachment of attachments) {
+        if (attachment.file) {
+          const validation = this.validateFile(attachment.file, validationOptions);
+          if (!validation.isValid) {
+            throw new Error(`File "${attachment.file.name}": ${validation.error}`);
+          }
         }
       }
 
-      // Validate minimum files requirement
-      if (files.length === 0) {
-        throw new Error('At least one file is required');
+      // Validate minimum attachments requirement
+      if (attachments.length === 0) {
+        throw new Error('At least one attachment is required');
       }
 
       const formData = new FormData();
       
-      // Add all files - try different approaches
-      files.forEach((file, index) => {
+      // Add attachment items
+      attachments.forEach((attachment, index) => {
+        // Add file if provided
+        if (attachment.file) {
+          formData.append(`attachments[${index}].file`, attachment.file);
+        }
         
-        // Method 1: Append with same key (for List<IFormFile>)
-        formData.append("Files", file);
-       
+        // Add description if provided
+        if (attachment.description && attachment.description.trim()) {
+          formData.append(`attachments[${index}].description`, attachment.description.trim());
+        }
+        
+        // Add attachment type (required)
+        if (attachment.attachmentType && attachment.attachmentType.trim()) {
+          formData.append(`attachments[${index}].attachmentType`, attachment.attachmentType.trim());
+        }
       });
       
       // Add metadata
-      formData.append('EntityType', entityType.toString());
-      formData.append('EntityId', entityId.toString());
-      formData.append('UploadedBy', uploadedBy);
-      
-      // Add descriptions if provided
-      if (descriptions && descriptions.length > 0) {
-        descriptions.forEach(description => {
-          if (description && description.trim()) {
-            formData.append('Descriptions', description.trim());
-          }
-        });
-      }
+      formData.append('entityType', entityType.toString());
+      formData.append('entityId', entityId.toString());
+      formData.append('uploadedBy', uploadedBy);
       
       
       const response = await uploadClient.post<{

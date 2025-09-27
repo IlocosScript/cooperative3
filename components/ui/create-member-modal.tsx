@@ -96,8 +96,9 @@ interface FileAttachment {
   name: string;
   size: number;
   type: string;
-  file: File;
+  file?: File; // Made optional - can be undefined for existing attachments
   description?: string;
+  attachmentType: string; // Required field for attachment type
 }
 
 interface CreateMemberData {
@@ -481,6 +482,7 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
           size: att.FileSize || 0,
           type: att.ContentType || '',
           description: att.Description || '',
+          attachmentType: (att as any).AttachmentType || '', // Add attachment type from API response
           file: new File([], att.OriginalFileName || '') // API response doesn't have file property
         })) : []
       };
@@ -660,53 +662,6 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
     }));
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (files) {
-      const newAttachments: FileAttachment[] = [];
-      
-      Array.from(files).forEach(file => {
-        // Use the centralized validation from FileUploadApiService
-        const validation = FileUploadApiService.validateFile(file);
-        
-        if (!validation.isValid) {
-          // Provide more user-friendly error messages
-          let userFriendlyError = validation.error || 'File validation failed';
-          
-          if (validation.error && validation.error.includes('exceeds') && validation.error.includes('MB')) {
-            userFriendlyError = `File size exceeds 10MB limit. Please choose a smaller file.`;
-          } else if (validation.error && validation.error.includes('File type not allowed')) {
-            userFriendlyError = `File type not supported. Please use PDF, JPG, JPEG, PNG, DOC, or DOCX files.`;
-          } else if (validation.error && validation.error.includes('cannot be empty')) {
-            userFriendlyError = `File is empty. Please choose a valid file.`;
-          }
-          
-          toast.error(`"${file.name}": ${userFriendlyError}`);
-          return;
-        }
-
-        
-        newAttachments.push({
-        id: Math.random().toString(36).substr(2, 9),
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        file
-        });
-      });
-      
-      if (newAttachments.length > 0) {
-      setFormData(prev => ({
-        ...prev,
-        fileAttachments: [...prev.fileAttachments, ...newAttachments]
-      }));
-        toast.success(`${newAttachments.length} file(s) added successfully`);
-    }
-    }
-    
-    // Clear the input to allow selecting the same files again
-    event.target.value = '';
-  };
 
   const removeFile = (id: string) => {
     const fileToRemove = formData.fileAttachments.find(file => file.id === id);
@@ -728,6 +683,78 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
         file.id === id ? { ...file, description } : file
       )
     }));
+  };
+
+  const updateFileAttachmentType = (id: string, attachmentType: string) => {
+    setFormData(prev => ({
+      ...prev,
+      fileAttachments: prev.fileAttachments.map(file => 
+        file.id === id ? { ...file, attachmentType } : file
+      )
+    }));
+  };
+
+  const addAttachmentWithoutFile = () => {
+    const newAttachment: FileAttachment = {
+      id: Math.random().toString(36).substr(2, 9),
+      name: 'No file attached',
+      size: 0,
+      type: '',
+      attachmentType: '',
+      description: ''
+    };
+    
+    setFormData(prev => ({
+      ...prev,
+      fileAttachments: [...prev.fileAttachments, newAttachment]
+    }));
+    
+    toast.info('New attachment record added. Please fill in the attachment type.');
+  };
+
+  const handleIndividualFileUpload = (attachmentId: string, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+        // Use the centralized validation from FileUploadApiService
+        const validation = FileUploadApiService.validateFile(file);
+        
+        if (!validation.isValid) {
+          // Provide more user-friendly error messages
+          let userFriendlyError = validation.error || 'File validation failed';
+          
+          if (validation.error && validation.error.includes('exceeds') && validation.error.includes('MB')) {
+            userFriendlyError = `File size exceeds 10MB limit. Please choose a smaller file.`;
+          } else if (validation.error && validation.error.includes('File type not allowed')) {
+            userFriendlyError = `File type not supported. Please use PDF, JPG, JPEG, PNG, DOC, or DOCX files.`;
+          } else if (validation.error && validation.error.includes('cannot be empty')) {
+            userFriendlyError = `File is empty. Please choose a valid file.`;
+          }
+          
+          toast.error(`"${file.name}": ${userFriendlyError}`);
+          return;
+        }
+
+      // Update the attachment with the new file
+      setFormData(prev => ({
+        ...prev,
+        fileAttachments: prev.fileAttachments.map(attachment => 
+          attachment.id === attachmentId 
+            ? { 
+                ...attachment, 
+                file, 
+                name: file.name, 
+                size: file.size, 
+                type: file.type 
+              } 
+            : attachment
+        )
+      }));
+      
+      toast.success(`File "${file.name}" added successfully`);
+    }
+    
+    // Clear the input to allow selecting the same file again
+    event.target.value = '';
   };
 
   const formatFileSize = (bytes: number) => {
@@ -794,6 +821,19 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
           }
         });
       }
+      
+      // Validate file attachments - attachment type is required for each new file
+      formData.fileAttachments.forEach((attachment, index) => {
+        // Only validate new attachments (not existing ones from API)
+        if (attachment.name !== 'No file attached' && attachment.file && attachment.file.size === 0) {
+          // This is an existing attachment from API, skip validation
+          return;
+        }
+        
+        if (!attachment.attachmentType.trim()) {
+          validationErrors[`fileAttachments.${index}.attachmentType`] = `File ${index + 1}: Attachment type is required`;
+        }
+      });
       
       if (Object.keys(validationErrors).length > 0) {
         setErrors(validationErrors);
@@ -943,15 +983,30 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
       // Upload files using the new file upload API if there are files to upload
       if (formData.fileAttachments.length > 0) {
         // Show immediate feedback about file attachments
-        const existingFilesCount = formData.fileAttachments.filter(attachment => !attachment.file || attachment.file.size === 0).length;
-        const newFilesCount = formData.fileAttachments.filter(attachment => attachment.file && attachment.file.size > 0).length;
+        const existingFilesCount = formData.fileAttachments.filter(attachment => 
+          attachment.file && attachment.file.size === 0 && attachment.name !== 'No file attached'
+        ).length;
+        const newFilesCount = formData.fileAttachments.filter(attachment => 
+          attachment.file && attachment.file.size > 0
+        ).length;
+        const attachmentRecordsCount = formData.fileAttachments.filter(attachment => 
+          attachment.name === 'No file attached'
+        ).length;
         
-        if (existingFilesCount > 0 && newFilesCount > 0) {
+        if (existingFilesCount > 0 && newFilesCount > 0 && attachmentRecordsCount > 0) {
+          toast.info(`Found ${existingFilesCount} existing attachment(s), ${newFilesCount} new file(s) to upload, and ${attachmentRecordsCount} attachment record(s) without files`);
+        } else if (existingFilesCount > 0 && newFilesCount > 0) {
           toast.info(`Found ${existingFilesCount} existing attachment(s) and ${newFilesCount} new file(s) to upload`);
+        } else if (existingFilesCount > 0 && attachmentRecordsCount > 0) {
+          toast.info(`Found ${existingFilesCount} existing attachment(s) and ${attachmentRecordsCount} attachment record(s) without files`);
+        } else if (newFilesCount > 0 && attachmentRecordsCount > 0) {
+          toast.info(`Found ${newFilesCount} new file(s) to upload and ${attachmentRecordsCount} attachment record(s) without files`);
         } else if (existingFilesCount > 0) {
           toast.info(`Found ${existingFilesCount} existing attachment(s) to manage`);
         } else if (newFilesCount > 0) {
           toast.info(`Found ${newFilesCount} new file(s) to upload`);
+        } else if (attachmentRecordsCount > 0) {
+          toast.info(`Found ${attachmentRecordsCount} attachment record(s) without files`);
         }
         setIsUploadingFiles(true);
         setUploadProgress({});
@@ -966,36 +1021,54 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
           // For now, using a placeholder - replace with actual user from auth context
           const uploadedBy = localStorage.getItem('current-user') || 'system-user';
           
-          // Extract files and descriptions for multi-file upload
-          const files = formData.fileAttachments
-            .filter(attachment => attachment.file && attachment.file.size > 0) // Only include valid files
-            .map(attachment => attachment.file!);
-          const descriptions = formData.fileAttachments
-            .filter(attachment => attachment.file && attachment.file.size > 0) // Match the same filter
-            .map(attachment => 
-              attachment.description || `Member document - ${attachment.name}`
-            );
+          // Prepare attachments for upload - include all new attachments (with or without files)
+          const attachmentsToUpload = formData.fileAttachments
+            .filter(attachment => {
+              // Include new attachments (not existing ones from API)
+              return attachment.name === 'No file attached' || (attachment.file && attachment.file.size > 0);
+            })
+            .map(attachment => ({
+              file: attachment.file && attachment.file.size > 0 ? attachment.file : undefined,
+              description: attachment.description || undefined,
+              attachmentType: attachment.attachmentType
+            }));
 
 
-          // Check if there are new files to upload
-          if (files.length === 0) {
-            // No new files to upload, but existing files are already displayed
-            toast.info('No new files to upload - existing attachments are preserved');
+          // Check if there are new attachments to upload
+          if (attachmentsToUpload.length === 0) {
+            // No new attachments to upload, but existing attachments are already displayed
+            if (attachmentRecordsCount > 0) {
+              toast.info(`No new attachments to upload - ${attachmentRecordsCount} existing attachment(s) are preserved`);
+            } else {
+              toast.info('No new attachments to upload - existing attachments are preserved');
+            }
           } else {
-    
-          // Upload all files at once using the new multi-file upload endpoint
-          const uploadResults = await FileUploadApiService.uploadMultipleFileAttachments(
-            files,
-            1, // EntityType: 1 = Member
-            memberId,
-            uploadedBy,
-            descriptions
-          );
-          
-          
-            const successMessage = mode === 'create' 
-              ? `Member created and ${files.length} file(s) uploaded successfully!`
-              : `Member updated with ${existingFilesCount} existing attachment(s) and ${files.length} new file(s) uploaded successfully!`;
+            // Upload all attachments at once using the new API structure
+            const uploadResults = await FileUploadApiService.uploadMultipleFileAttachments(
+              attachmentsToUpload,
+              1, // EntityType: 1 = Member
+              memberId,
+              uploadedBy
+            );
+            
+            const totalAttachmentsUploaded = attachmentsToUpload.length;
+            const filesWithAttachments = attachmentsToUpload.filter(att => att.file).length;
+            const attachmentsWithoutFiles = attachmentsToUpload.filter(att => !att.file).length;
+            
+            let successMessage = '';
+            if (filesWithAttachments > 0 && attachmentsWithoutFiles > 0) {
+              successMessage = mode === 'create' 
+                ? `Member created with ${filesWithAttachments} file(s) and ${attachmentsWithoutFiles} attachment record(s) uploaded successfully!`
+                : `Member updated with ${existingFilesCount} existing attachment(s), ${filesWithAttachments} new file(s), and ${attachmentsWithoutFiles} attachment record(s) uploaded successfully!`;
+            } else if (filesWithAttachments > 0) {
+              successMessage = mode === 'create' 
+                ? `Member created and ${filesWithAttachments} file(s) uploaded successfully!`
+                : `Member updated with ${existingFilesCount} existing attachment(s) and ${filesWithAttachments} new file(s) uploaded successfully!`;
+            } else {
+              successMessage = mode === 'create' 
+                ? `Member created with ${attachmentsWithoutFiles} attachment record(s) uploaded successfully!`
+                : `Member updated with ${existingFilesCount} existing attachment(s) and ${attachmentsWithoutFiles} attachment record(s) uploaded successfully!`;
+            }
             toast.success(successMessage);
           }
         } catch (error) {
@@ -1028,7 +1101,15 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
         }
       } else {
         // No files to upload, just show success message
+        const attachmentRecordsCount = formData.fileAttachments.filter(attachment => 
+          attachment.name === 'No file attached'
+        ).length;
+        
+        if (attachmentRecordsCount > 0) {
+          toast.success(`Member ${mode === 'create' ? 'created' : 'updated'} successfully with ${attachmentRecordsCount} attachment record(s)!`);
+        } else {
         toast.success(`Member ${mode === 'create' ? 'created' : 'updated'} successfully!`);
+        }
       }
       
       // Call onSubmit callback with the result
@@ -1156,7 +1237,18 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
         // Income step - no required validation, can be empty
         break;
       case 6:
-        // File attachments step - no required validation, can be empty
+        // File attachments step - validate attachment types for new files only
+        formData.fileAttachments.forEach((attachment, index) => {
+          // Only validate new attachments (not existing ones from API)
+          if (attachment.name !== 'No file attached' && attachment.file && attachment.file.size === 0) {
+            // This is an existing attachment from API, skip validation
+            return;
+          }
+          
+          if (!attachment.attachmentType.trim()) {
+            validationErrors[`fileAttachments.${index}.attachmentType`] = `File ${index + 1}: Attachment type is required`;
+          }
+        });
         break;
     }
     
@@ -1241,8 +1333,21 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
       case 3:
       case 4:
       case 5:
-      case 6:
         // These steps are optional, always valid
+        break;
+      case 6:
+        // File attachments step - validate attachment types for new files only
+        formData.fileAttachments.forEach((attachment, index) => {
+          // Only validate new attachments (not existing ones from API)
+          if (attachment.name !== 'No file attached' && attachment.file && attachment.file.size === 0) {
+            // This is an existing attachment from API, skip validation
+            return;
+          }
+          
+          if (!attachment.attachmentType.trim()) {
+            validationErrors[`fileAttachments.${index}.attachmentType`] = 'Required';
+          }
+        });
         break;
     }
     
@@ -2170,6 +2275,8 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
                       setCurrentStep(4);
                     } else if (firstError.includes('incomes')) {
                       setCurrentStep(5);
+                    } else if (firstError.includes('fileAttachments')) {
+                      setCurrentStep(6);
                     }
                   }}
                 >
@@ -2182,22 +2289,16 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
       )}
 
       <div>
-        <h3 className="text-lg font-medium mb-4">File Attachments</h3>
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-          <Upload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
-          <Label htmlFor="file-upload" className="cursor-pointer">
-            <span className="text-blue-600 hover:text-blue-500">Click to upload</span> or drag and drop
-          </Label>
-          <p className="text-sm text-gray-500 mt-1">PDF, DOC, DOCX, JPG, PNG up to 10MB each</p>
-          <input
-            id="file-upload"
-            type="file"
-            multiple
-            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-            onChange={handleFileUpload}
-            className="hidden"
-          />
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium">File Attachments</h3>
+          <div className="flex space-x-2">
+            <Button type="button" variant="outline" size="sm" onClick={addAttachmentWithoutFile}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Attachment Record
+            </Button>
+          </div>
         </div>
+        
         
       </div>
 
@@ -2216,7 +2317,11 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
                     <div className="flex items-center space-x-2">
                       <p className="font-medium text-sm">{file.name}</p>
                       {!file.file || file.file.size === 0 ? (
+                        file.name === 'No file attached' ? (
+                          <Badge variant="destructive" className="text-xs">No File</Badge>
+                        ) : (
                         <Badge variant="outline" className="text-xs">Existing</Badge>
+                        )
                       ) : (
                         <Badge variant="secondary" className="text-xs">New</Badge>
                       )}
@@ -2233,10 +2338,43 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
                   <X className="w-4 h-4" />
                 </Button>
                 </div>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor={`file-description-${file.id}`} className="text-sm font-medium">
-                    Description (Optional)
+                      <Label className="text-sm font-medium">
+                        Attachment Type *
                   </Label>
+                      {/* Show as read-only text for existing attachments, editable for new ones */}
+                      {file.file && file.file.size === 0 && file.name !== 'No file attached' ? (
+                        <div className="mt-1 p-2 bg-gray-50 border border-gray-200 rounded-md">
+                          <p className="text-sm text-gray-700">{file.attachmentType || 'Not specified'}</p>
+                        </div>
+                      ) : (
+                        <>
+                          <Input
+                            id={`file-attachment-type-${file.id}`}
+                            value={file.attachmentType || ''}
+                            onChange={(e) => updateFileAttachmentType(file.id, e.target.value)}
+                            placeholder="e.g., ID Document, Contract, Photo..."
+                            className={`mt-1 ${errors[`fileAttachments.${formData.fileAttachments.findIndex(f => f.id === file.id)}.attachmentType`] ? 'border-red-500' : ''}`}
+                            required
+                          />
+                          {errors[`fileAttachments.${formData.fileAttachments.findIndex(f => f.id === file.id)}.attachmentType`] && (
+                            <p className="mt-1 text-sm text-red-600">{errors[`fileAttachments.${formData.fileAttachments.findIndex(f => f.id === file.id)}.attachmentType`]}</p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">
+                        Description
+                      </Label>
+                      {/* Show as read-only text for existing attachments, editable for new ones */}
+                      {file.file && file.file.size === 0 && file.name !== 'No file attached' ? (
+                        <div className="mt-1 p-2 bg-gray-50 border border-gray-200 rounded-md">
+                          <p className="text-sm text-gray-700">{file.description || 'No description'}</p>
+                        </div>
+                      ) : (
                   <Input
                     id={`file-description-${file.id}`}
                     value={file.description || ''}
@@ -2244,6 +2382,96 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
                     placeholder="Enter a description for this file..."
                     className="mt-1"
                   />
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* File Upload Section - Only show for new attachments without files */}
+                  {file.name === 'No file attached' ? (
+                    <div className="border-t pt-4">
+                      <Label className="text-sm font-medium mb-2 block">File Upload (Optional)</Label>
+                      <div className="flex items-center space-x-4">
+                        <div className="flex-1">
+                          <Label htmlFor={`individual-file-upload-${file.id}`} className="cursor-pointer">
+                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-gray-400 transition-colors">
+                              <Upload className="w-6 h-6 mx-auto text-gray-400 mb-2" />
+                              <span className="text-blue-600 hover:text-blue-500 text-sm">Click to upload file</span>
+                              <p className="text-xs text-gray-500 mt-1">PDF, DOC, DOCX, JPG, PNG up to 10MB</p>
+                            </div>
+                          </Label>
+                          <input
+                            id={`individual-file-upload-${file.id}`}
+                            type="file"
+                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                            onChange={(e) => handleIndividualFileUpload(file.id, e)}
+                            className="hidden"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Show file info for attachments with files (existing or new) */
+                    <div className="border-t pt-4">
+                      <Label className="text-sm font-medium mb-2 block">File Information</Label>
+                      <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <FileText className="w-5 h-5 text-green-600" />
+                          <div>
+                            <p className="text-sm font-medium text-green-800">{file.name}</p>
+                            <p className="text-xs text-green-600">{formatFileSize(file.size)}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          {/* Only show remove/replace buttons for new attachments with files, not existing ones */}
+                          {file.file && file.file.size > 0 ? (
+                            <>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    fileAttachments: prev.fileAttachments.map(attachment => 
+                                      attachment.id === file.id 
+                                        ? { 
+                                            ...attachment, 
+                                            file: undefined, 
+                                            name: 'No file attached', 
+                                            size: 0, 
+                                            type: '' 
+                                          } 
+                                        : attachment
+                                    )
+                                  }));
+                                  toast.info('File removed from attachment');
+                                }}
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                              <Label htmlFor={`replace-file-upload-${file.id}`} className="cursor-pointer">
+                                <Button type="button" variant="outline" size="sm" asChild>
+                                  <span>Replace</span>
+                                </Button>
+                              </Label>
+                              <input
+                                id={`replace-file-upload-${file.id}`}
+                                type="file"
+                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                onChange={(e) => handleIndividualFileUpload(file.id, e)}
+                                className="hidden"
+                              />
+                            </>
+                          ) : (
+                            /* For existing attachments, show read-only info */
+                            <div className="text-xs text-gray-500">
+                              Existing file
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
