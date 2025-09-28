@@ -26,7 +26,7 @@ import {
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
-import { Member, MemberApiResponse, MembersQueryParams, getStatusLabel, getStatusVariant, getMembershipTypeLabel, getGenderLabel, getCivilStatusLabel } from '@/lib/types/members';
+import { Member, MemberApiResponse, MembersQueryParams, getStatusLabel, getStatusVariant, getMembershipTypeLabel, getGenderLabel, getCivilStatusLabel } from '@/lib/dto/member.dto';
 import MembersApiService from '@/lib/services/membersApi';
 import MemberDetailsModal from '@/components/ui/member-details-modal';
 import CreateMemberModal from '@/components/ui/create-member-modal';
@@ -541,6 +541,7 @@ export default function MembersPage() {
                                   setSelectedMember(member);
                                   setIsViewDialogOpen(true);
                                 }}
+                                title="View Details & Attachments"
                               >
                                 <Eye className="w-4 h-4" />
                               </Button>
@@ -549,6 +550,7 @@ export default function MembersPage() {
                                   variant="ghost" 
                                   size="sm"
                                   onClick={() => handleEditMember(member)}
+                                  title="Edit Member"
                                 >
                                   <Edit className="w-4 h-4" />
                                 </Button>
@@ -644,6 +646,7 @@ export default function MembersPage() {
            memberData={selectedMember || undefined}
            onSubmit={handleUpdateMember}
          />
+
       </div>
     </div>
   );

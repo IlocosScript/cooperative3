@@ -103,7 +103,6 @@ export interface Address {
   country: string;
   isPrimary: boolean;
   isCurrent: boolean;
-  notes?: string;
 }
 
 // API Response interfaces (PascalCase)
@@ -195,7 +194,6 @@ export interface Education {
   yearCompleted: number;
   yearStarted: number;
   isHighestAttainment: boolean;
-  notes?: string;
 }
 
 // API Response interfaces (PascalCase)
@@ -270,6 +268,7 @@ export interface CreateMemberRequest {
     fileName: string;
     description?: string;
   }[];
+  attachmentsToDelete?: number[];
 }
 
 export interface MembersResponse {

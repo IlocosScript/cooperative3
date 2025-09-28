@@ -1,26 +1,6 @@
 import axios from 'axios';
 import { uploadClient, handleApiResponse, handleApiError } from '../config/apiClient';
-
-// File upload response interface
-export interface FileUploadResponse {
-  id: number;
-  fileName: string;
-  originalFileName: string;
-  fileSize: number;
-  contentType: string;
-  uploadDate: string;
-  uploadedBy: string;
-  description?: string;
-  createdDate: string;
-  modifiedDate: string | null;
-}
-
-// File validation options
-export interface FileValidationOptions {
-  maxSize?: number; // in bytes, default 10MB
-  allowedTypes?: string[]; // MIME types
-  allowEmpty?: boolean; // default false
-}
+import { FileUploadResponse, FileValidationOptions } from '../dto/file-upload.dto';
 
 // Default validation options
 const DEFAULT_VALIDATION_OPTIONS: FileValidationOptions = {
@@ -373,6 +353,123 @@ export class FileUploadApiService {
       });
       
       return response.data;
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  }
+
+  /**
+   * Download file with automatic browser download
+   */
+  static async downloadFile(id: number, filename: string): Promise<void> {
+    try {
+      const blob = await this.downloadFileAttachment(id);
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  }
+
+  /**
+   * Download selected attachments as zip
+   */
+  static async downloadSelectedAttachments(attachmentIds: number[], zipFileName?: string): Promise<Blob> {
+    try {
+      const response = await uploadClient.post('/api/attachments/download/selected', {
+        attachmentIds,
+        zipFileName
+      }, {
+        responseType: 'blob'
+      });
+      
+      return response.data;
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  }
+
+  /**
+   * Download all entity attachments as zip
+   */
+  static async downloadEntityAttachments(entityType: string, entityId: number, options?: {
+    zipFileName?: string;
+    attachmentType?: string;
+  }): Promise<Blob> {
+    try {
+      const response = await uploadClient.post(`/api/attachments/download/entity/${entityType}/${entityId}`, {
+        zipFileName: options?.zipFileName,
+        attachmentType: options?.attachmentType
+      }, {
+        responseType: 'blob'
+      });
+      
+      return response.data;
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  }
+
+  /**
+   * Download selected files with automatic browser download
+   */
+  static async downloadSelectedFiles(attachmentIds: number[], zipFileName?: string): Promise<void> {
+    try {
+      const blob = await this.downloadSelectedAttachments(attachmentIds, zipFileName);
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = zipFileName || `selected_attachments_${new Date().toISOString().slice(0,10).replace(/-/g, '')}.zip`;
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  }
+
+  /**
+   * Download entity files with automatic browser download
+   */
+  static async downloadEntityFiles(entityType: string, entityId: number, options?: {
+    zipFileName?: string;
+    attachmentType?: string;
+  }): Promise<void> {
+    try {
+      const blob = await this.downloadEntityAttachments(entityType, entityId, options);
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = options?.zipFileName || `${entityType}_${entityId}_attachments_${new Date().toISOString().slice(0,10).replace(/-/g, '')}.zip`;
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
     } catch (error) {
       throw new Error(handleApiError(error));
     }

@@ -42,96 +42,17 @@ import {
   CreateMemberRequest,
   Member,
   MemberApiResponse
-} from '@/lib/types/members';
-
-interface Address {
-  addressType: number;
-  streetAddress1: string;
-  streetAddress2?: string;
-  city: string;
-  province: string;
-  postalCode: string;
-  country: string;
-  isPrimary: boolean;
-  isCurrent: boolean;
-  notes?: string;
-}
-
-interface ContactNumber {
-  phoneNumber: string;
-  isPrimary: boolean;
-}
-
-interface Dependent {
-  firstName: string;
-  lastName: string;
-  middleName?: string;
-  relationship: number;
-  dateOfBirth: string;
-  genderType: number;
-  address?: string;
-  isDependent: boolean;
-  isBeneficiary: boolean;
-  benefitTypes: number[];
-}
-
-interface Education {
-  educationAttainmentType: number;
-  schoolName: string;
-  course?: string;
-  yearCompleted: number;
-  yearStarted: number;
-  isHighestAttainment: boolean;
-  notes?: string;
-}
-
-interface Income {
-  source: string;
-  incomeAmount: number;
-  isPrimary: boolean;
-}
-
-interface FileAttachment {
-  id: string;
-  name: string;
-  size: number;
-  type: string;
-  file?: File; // Made optional - can be undefined for existing attachments
-  description?: string;
-  attachmentType: string; // Required field for attachment type
-}
-
-interface CreateMemberData {
-  firstName: string;
-  lastName: string;
-  middleName: string;
-  dateOfBirth: string;
-  birthplace: string;
-  genderType: number;
-  civilStatus: number;
-  tin: string;
-  bodNumber?: string;
-  memberNumber?: string;
-  status: number;
-  membershipType: number;
-  membershipDate: string;
-  terminationDate?: string;
-  notes?: string;
-  addresses: Address[];
-  contactNumbers: ContactNumber[];
-  dependents: Dependent[];
-  educations: Education[];
-  incomes: Income[];
-  fileAttachments: FileAttachment[];
-}
-
-interface CreateMemberModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  mode: 'create' | 'update';
-  memberData?: MemberApiResponse; // For update mode - API response type
-  onSubmit?: (data: Member | MemberApiResponse) => void;
-}
+} from '@/lib/dto/member.dto';
+import { 
+  CreateMemberData,
+  CreateMemberModalProps,
+  ModalFileAttachment,
+  Address,
+  ContactNumber,
+  Dependent,
+  Education,
+  Income
+} from '@/lib/dto/member-modal.dto';
 
 // Generate options from existing enums
 const GENDER_OPTIONS = Object.values(Gender)
@@ -219,8 +140,7 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
         postalCode: '',
         country: 'Philippines',
         isPrimary: true,
-        isCurrent: true,
-        notes: ''
+        isCurrent: true
       }
     ],
     contactNumbers: [
@@ -284,7 +204,6 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
           country: address.Country || 'Philippines',
           isPrimary: address.IsPrimary || false,
           isCurrent: address.IsCurrent || false,
-          notes: address.Notes || ''
         }));
       } else if (memberData.PrimaryAddress && memberData.PrimaryAddress.trim()) {
         addresses = [
@@ -298,7 +217,6 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
             country: 'Philippines',
             isPrimary: true,
             isCurrent: true,
-            notes: ''
           }
         ];
       } else {
@@ -313,7 +231,6 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
             country: 'Philippines',
             isPrimary: true,
             isCurrent: true,
-            notes: ''
           }
         ];
       }
@@ -468,7 +385,6 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
             yearCompleted: education.YearCompleted || new Date().getFullYear(),
             yearStarted: education.YearStarted || new Date().getFullYear(),
             isHighestAttainment: education.IsHighestAttainment || false,
-            notes: education.Notes || ''
           };
         }) : [],
         incomes: memberData.Incomes ? memberData.Incomes.map(income => ({
@@ -520,7 +436,6 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
     setFormData(prev => ({
       ...prev,
       addresses: [
-        ...prev.addresses,
         {
           addressType: 1,
           streetAddress1: '',
@@ -530,9 +445,9 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
           postalCode: '',
           country: 'Philippines',
           isPrimary: false,
-          isCurrent: true,
-          notes: ''
-        }
+          isCurrent: true
+        },
+        ...prev.addresses
       ]
     }));
   };
@@ -554,11 +469,11 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
     setFormData(prev => ({
       ...prev,
       contactNumbers: [
-        ...prev.contactNumbers,
         {
           phoneNumber: '',
           isPrimary: false
-        }
+        },
+        ...prev.contactNumbers
       ]
     }));
   };
@@ -574,7 +489,6 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
     setFormData(prev => ({
       ...prev,
       dependents: [
-        ...prev.dependents,
         {
           firstName: '',
           lastName: '',
@@ -586,7 +500,8 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
           isDependent: true,
           isBeneficiary: true,
           benefitTypes: []
-        }
+        },
+        ...prev.dependents
       ]
     }));
   };
@@ -608,16 +523,15 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
     setFormData(prev => ({
       ...prev,
       educations: [
-        ...prev.educations,
         {
           educationAttainmentType: 1,
           schoolName: '',
           course: '',
           yearCompleted: new Date().getFullYear(),
           yearStarted: new Date().getFullYear(),
-          isHighestAttainment: false,
-          notes: ''
-        }
+          isHighestAttainment: false
+        },
+        ...prev.educations
       ]
     }));
   };
@@ -639,12 +553,12 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
     setFormData(prev => ({
       ...prev,
       incomes: [
-        ...prev.incomes,
         {
           source: '',
           incomeAmount: 0,
           isPrimary: false
-        }
+        },
+        ...prev.incomes
       ]
     }));
   };
@@ -695,7 +609,7 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
   };
 
   const addAttachmentWithoutFile = () => {
-    const newAttachment: FileAttachment = {
+    const newAttachment: ModalFileAttachment = {
       id: Math.random().toString(36).substr(2, 9),
       name: 'No file attached',
       size: 0,
@@ -706,7 +620,7 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
     
     setFormData(prev => ({
       ...prev,
-      fileAttachments: [...prev.fileAttachments, newAttachment]
+      fileAttachments: [newAttachment, ...prev.fileAttachments]
     }));
     
     toast.info('New attachment record added. Please fill in the attachment type.');
@@ -912,7 +826,6 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
               country: address.country,
               isPrimary: address.isPrimary,
               isCurrent: address.isCurrent,
-              notes: address.notes
             };
           }),
           contactNumbers: memberRequest.contactNumbers.map((contact, index) => {
@@ -952,7 +865,6 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
               yearCompleted: education.yearCompleted,
               yearStarted: education.yearStarted,
               isHighestAttainment: education.isHighestAttainment,
-              notes: education.notes
             };
           }),
           incomes: memberRequest.incomes.map((income, index) => {
@@ -965,15 +877,18 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
               isPrimary: income.isPrimary
             };
           }),
-          // Include list of existing attachments that should be kept
-          // This allows the server to know which attachments to delete (those not in this list)
-          attachments: formData.fileAttachments
-            .filter(attachment => !attachment.file || attachment.file.size === 0) // Only existing attachments (no File object)
-            .map(attachment => ({
-              id: parseInt(attachment.id), // Convert string ID back to number
-              fileName: attachment.name,
-              description: attachment.description || ''
-            }))
+          // Calculate which attachments should be deleted
+          // These are attachments that were originally loaded but are no longer in formData.fileAttachments
+          attachmentsToDelete: memberData.Attachments
+            ? memberData.Attachments
+                .filter(originalAttachment => 
+                  // Check if this original attachment is no longer in the current formData.fileAttachments
+                  !formData.fileAttachments.some(currentAttachment => 
+                    currentAttachment.id === originalAttachment.Id.toString()
+                  )
+                )
+                .map(attachment => attachment.Id)
+            : []
         };
         
         result = await MembersApiService.default.updateMember(memberData.Id, updateRequest);
@@ -1146,7 +1061,6 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
             country: 'Philippines',
             isPrimary: true,
             isCurrent: true,
-            notes: ''
           }
         ],
         contactNumbers: [
@@ -1618,16 +1532,6 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
          </div>
        </div>
 
-       <div>
-         <Label htmlFor="notes">Notes</Label>
-         <Textarea
-           id="notes"
-           value={formData.notes || ''}
-           onChange={(e) => updateFormData('notes', e.target.value)}
-           placeholder="Additional notes about the member"
-           rows={3}
-         />
-       </div>
 
       {/* Contact Numbers Section */}
       <div className="border-t pt-6">
@@ -1821,15 +1725,6 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
               </div>
             </div>
 
-            <div>
-              <Label>Notes</Label>
-              <Textarea
-                value={address.notes || ''}
-                onChange={(e) => updateAddress(index, 'notes', e.target.value)}
-                placeholder="Additional notes about this address"
-                rows={2}
-              />
-            </div>
 
             <div className="grid grid-cols-3 gap-4">
               <div>
@@ -2138,15 +2033,6 @@ export default function CreateMemberModal({ isOpen, onClose, mode, memberData, o
               </div>
             </div>
 
-            <div>
-              <Label>Notes</Label>
-              <Textarea
-                value={education.notes || ''}
-                onChange={(e) => updateEducation(index, 'notes', e.target.value)}
-                placeholder="Additional notes about this education"
-                rows={2}
-              />
-            </div>
           </CardContent>
         </Card>
       ))}

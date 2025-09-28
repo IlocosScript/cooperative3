@@ -1,67 +1,7 @@
 import axios from 'axios';
 import { apiClient, handleApiResponse, handleApiError } from '../config/apiClient';
-import { Member, MemberApiResponse, MembersResponse, MembersQueryParams, ApiError } from '../types/members';
+import { Member, MemberApiResponse, MembersResponse, MembersQueryParams, ApiError, CreateMemberRequest } from '../dto/member.dto';
 
-// Interface for the create member request payload
-interface CreateMemberRequest {
-  firstName: string;
-  lastName: string;
-  middleName?: string;
-  dateOfBirth: string;
-  birthplace?: string;
-  genderType: number;
-  civilStatus: number;
-  tin?: string;
-  bodNumber?: string;
-  memberNumber?: string;
-  status: number;
-  membershipType: number;
-  membershipDate: string;
-  terminationDate?: string;
-  notes?: string;
-  addresses: Array<{
-    addressType: number;
-    streetAddress1: string;
-    streetAddress2?: string;
-    city: string;
-    province: string;
-    postalCode: string;
-    country: string;
-    isPrimary: boolean;
-    isCurrent: boolean;
-    notes?: string;
-  }>;
-  contactNumbers: Array<{
-    phoneNumber: string;
-    isPrimary: boolean;
-  }>;
-  dependents: Array<{
-    firstName: string;
-    lastName: string;
-    middleName?: string;
-    relationship: number;
-    dateOfBirth: string;
-    genderType: number;
-    address?: string;
-    isDependent: boolean;
-    isBeneficiary: boolean;
-    benefitTypes: number[];
-  }>;
-  educations: Array<{
-    educationAttainmentType: number;
-    schoolName: string;
-    course?: string;
-    yearCompleted: number;
-    yearStarted: number;
-    isHighestAttainment: boolean;
-    notes?: string;
-  }>;
-  incomes: Array<{
-    source: string;
-    incomeAmount: number;
-    isPrimary: boolean;
-  }>;
-}
 
 // Using shared apiClient from config
 
